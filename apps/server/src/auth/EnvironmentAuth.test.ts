@@ -8,6 +8,7 @@ import * as ServerConfig from "../config.ts";
 import { SqlitePersistenceMemory } from "../persistence/Layers/Sqlite.ts";
 import * as PairingGrantStore from "./PairingGrantStore.ts";
 import * as EnvironmentAuth from "./EnvironmentAuth.ts";
+import * as HostedWorkspaceAuthConfig from "./HostedWorkspaceAuthConfig.ts";
 
 import * as ServerSecretStore from "./ServerSecretStore.ts";
 import * as SessionStore from "./SessionStore.ts";
@@ -30,12 +31,23 @@ const makeServerConfigLayer = (overrides?: Partial<ServerConfig.ServerConfig["Se
     }),
   ).pipe(Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-auth-server-test-" })));
 
-const makeEnvironmentAuthLayer = (overrides?: Partial<ServerConfig.ServerConfig["Service"]>) =>
-  EnvironmentAuth.layer.pipe(
+const makeEnvironmentAuthLayer = (
+  overrides?: Partial<ServerConfig.ServerConfig["Service"]>,
+  hostedWorkspaceAuth?: HostedWorkspaceAuthConfig.HostedWorkspaceAuthConfigValue,
+) => {
+  const base = EnvironmentAuth.layer.pipe(
     Layer.provide(SqlitePersistenceMemory),
     Layer.provide(ServerSecretStore.layer),
     Layer.provide(makeServerConfigLayer(overrides)),
   );
+  return hostedWorkspaceAuth
+    ? base.pipe(
+        Layer.provide(
+          Layer.succeed(HostedWorkspaceAuthConfig.HostedWorkspaceAuthConfig, hostedWorkspaceAuth),
+        ),
+      )
+    : base;
+};
 
 const makeCookieRequest = (
   cookieName: string,
@@ -81,6 +93,32 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
         expect(error.cause).toBe(cause);
       }
     }),
+  );
+
+  it.effect("does not advertise hosted assertion bootstrap when disabled", () =>
+    Effect.gen(function* () {
+      const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
+      const descriptor = yield* serverAuth.getDescriptor();
+      expect(descriptor.bootstrapMethods).not.toContain("hosted-workspace-assertion");
+    }).pipe(Effect.provide(makeEnvironmentAuthLayer())),
+  );
+
+  it.effect("advertises hosted assertion bootstrap when configured", () =>
+    Effect.gen(function* () {
+      const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
+      const descriptor = yield* serverAuth.getDescriptor();
+      expect(descriptor.bootstrapMethods).toContain("hosted-workspace-assertion");
+    }).pipe(
+      Effect.provide(
+        makeEnvironmentAuthLayer(undefined, {
+          enabled: true,
+          issuer: "https://control.example.test",
+          workspaceId: "workspace-1",
+          publicKeys: new Map(),
+          sessionLifetimeSeconds: 43_200,
+        }),
+      ),
+    ),
   );
 
   it.effect("issues standard pairing credentials by default", () =>

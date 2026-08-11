@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: workspace-publisher-dry-run
+  namespace: t3codes-testing
+  labels:
+    app.kubernetes.io/name: t3-workspace-volume
+    hosted.t3.codes/organization-id: 00000000-0000-0000-0000-000000000010
+    hosted.t3.codes/volume-id: 00000000-0000-0000-0000-000000000030
+    hosted.t3.codes/retention-policy: retain
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn-ssd-orion
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: "1073741824"

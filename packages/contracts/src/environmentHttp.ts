@@ -14,6 +14,7 @@ import {
   AuthBrowserSessionResult,
   AuthClientSession,
   AuthCreatePairingCredentialInput,
+  AuthHostedWorkspaceTokenRequest,
   AuthPairingCredentialResult,
   AuthPairingLink,
   AuthRevokeClientSessionInput,
@@ -396,6 +397,13 @@ export class EnvironmentAuthHttpApi extends HttpApiGroup.make("auth")
     HttpApiEndpoint.post("token", "/oauth/token", {
       headers: OptionalDpopProofHeaders,
       payload: AuthTokenExchangeRequest,
+      success: AuthAccessTokenResult,
+      error: EnvironmentTokenExchangeErrors,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("hostedWorkspaceToken", "/api/auth/hosted-workspace-token", {
+      payload: AuthHostedWorkspaceTokenRequest,
       success: AuthAccessTokenResult,
       error: EnvironmentTokenExchangeErrors,
     }),

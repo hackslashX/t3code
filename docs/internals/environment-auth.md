@@ -92,6 +92,55 @@ bearer token.
 assume it. Relay-brokered clients use this mode so that a leaked token cannot be
 replayed without the corresponding key.
 
+### Hosted Workspace Assertion
+
+A Kubernetes-hosted T3 environment may opt into a control-plane bootstrap method by configuring all of:
+
+```text
+T3CODE_HOSTED_WORKSPACE_ISSUER
+T3CODE_HOSTED_WORKSPACE_ID
+T3CODE_HOSTED_WORKSPACE_PUBLIC_KEYS_DIR
+```
+
+The public-key directory contains ES256 public PEM files named `<kid>.pem`. Private signing keys remain in the hosted control plane. Partial configuration fails server startup; absent configuration leaves this method disabled. Configured environments advertise `hosted-workspace-assertion` in `bootstrapMethods`.
+
+The control plane loads its active signing key from external secret configuration:
+
+```text
+T3CODE_HOSTED_ASSERTION_ISSUER
+T3CODE_HOSTED_ASSERTION_KEY_ID
+T3CODE_HOSTED_ASSERTION_PRIVATE_KEY_FILE
+T3CODE_HOSTED_ASSERTION_LIFETIME_SECONDS  # optional; defaults to 60
+```
+
+After browser-session authentication and organization authorization, clients request a single-use assertion through:
+
+```text
+POST /api/organizations/:organizationId/workspaces/:workspaceId/access-assertion
+```
+
+The control plane issues assertions only when PostgreSQL reports the matching workspace as `Ready` with an operator-projected environment ID. Members, admins, and owners receive ordinary client scopes. Viewers receive only `orchestration:read`. The signing-key ID must match a `<kid>.pem` entry in the public-key ConfigMap mounted into workspace Pods.
+
+For browser access, `POST /api/organizations/:organizationId/workspaces/:workspaceId/proxy-session` performs the assertion exchange server-to-server and seals the resulting short-lived T3 bearer token into an AES-256-GCM, `HttpOnly`, `Secure` proxy cookie. Raw bearer tokens are not returned to browser JavaScript or stored in PostgreSQL. The cookie is cryptographically workspace-bound and expires no later than the T3 session.
+
+The dedicated workspace proxy routes exact hosts shaped as `t3-<workspace-id>.<suffix>` and `code-<workspace-id>.<suffix>`. It decrypts the cookie, verifies the host/workspace binding, strips browser credentials and untrusted forwarding headers, and injects the T3 bearer token only toward port 3000. code-server traffic uses port 3001 and relies on proxy authorization. Browser origins must exactly match the requested workspace host for mutations and WebSocket upgrades. The proxy injects the workspace-bound bearer credential during T3 WebSocket upgrades because browser WebSocket constructors cannot set authorization headers; direct environment connections can continue using one-use `wsTicket` query parameters.
+
+The proxy and control plane share only the externally mounted proxy-session encryption key. The proxy has no database or Kubernetes credentials. Its NetworkPolicy permits ingress from Traefik and egress only to DNS and workspace ports 3000/3001.
+
+The hosted management client is available at `/hosted`. It uses the shared `@t3tools/client-runtime/control-plane` boundary for identity, organization, workspace, storage, invitation, lifecycle, deletion, and proxy-session calls. The production static image is built by `apps/control-plane/Dockerfile.web` and runs without credentials or egress. External routing must send `/api`, `/healthz`, and `/readyz` to the control-plane Service and browser application routes/assets to `t3-hosted-web`, on one origin so the OIDC browser cookie remains host-only. Workspace wildcard hosts route to `t3-workspace-proxy`.
+
+Gateway API manifests remain deferred until the cluster exposes Gateway API resources. Do not replace the same-origin split with baked frontend HTTP or WebSocket origins.
+
+The authenticated workspace proxy submits the resulting assertion to:
+
+```text
+POST /api/auth/hosted-workspace-token
+```
+
+The assertion binds the hosted principal, organization, workspace, T3 environment ID, audience, scopes, expiry, and unique JTI. Its audience is `urn:t3:environment:<environment-id>` and its lifetime cannot exceed five minutes. Requested scopes must be a subset of ordinary client scopes; hosted assertions cannot grant environment access-management or relay-write capabilities.
+
+The server atomically records a hash of `(issuer, JTI)` in `ServerSecretStore` before issuing an opaque T3 bearer session. Reuse returns `401 invalid_credential`. The resulting session expires no later than the assertion and follows the ordinary bearer-session and WebSocket-ticket flow. Raw assertions and control-plane private keys are not persisted.
+
 ### WebSocket Ticket
 
 `POST /api/auth/websocket-ticket` accepts any authenticated session and returns

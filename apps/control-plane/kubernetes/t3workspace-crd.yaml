@@ -1,0 +1,190 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: t3workspaces.hosted.t3.codes
+spec:
+  group: hosted.t3.codes
+  scope: Namespaced
+  names:
+    plural: t3workspaces
+    singular: t3workspace
+    kind: T3Workspace
+    shortNames:
+      - t3ws
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Desired
+          type: string
+          jsonPath: .spec.desiredState
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Ready
+          type: string
+          jsonPath: .status.conditions[?(@.type=="Ready")].status
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required:
+                - organizationId
+                - workspaceId
+                - desiredState
+                - workspaceGeneration
+                - pvcName
+                - nodeName
+                - environmentId
+                - imageProfile
+                - egressProfile
+                - t3Image
+                - codeServerImage
+                - hostedAuth
+                - resources
+              x-kubernetes-validations:
+                - rule: self.organizationId == oldSelf.organizationId
+                  message: organizationId is immutable
+                - rule: self.workspaceId == oldSelf.workspaceId
+                  message: workspaceId is immutable
+                - rule: self.pvcName == oldSelf.pvcName
+                  message: pvcName is immutable
+                - rule: self.nodeName == oldSelf.nodeName
+                  message: nodeName is immutable
+                - rule: "!has(oldSelf.environmentId) || self.environmentId == oldSelf.environmentId"
+                  message: environmentId is immutable
+              properties:
+                organizationId:
+                  type: string
+                  format: uuid
+                workspaceId:
+                  type: string
+                  format: uuid
+                desiredState:
+                  type: string
+                  enum: [Running, Stopped]
+                workspaceGeneration:
+                  type: integer
+                  format: int64
+                  minimum: 0
+                pvcName:
+                  type: string
+                  minLength: 1
+                  maxLength: 253
+                nodeName:
+                  type: string
+                  minLength: 1
+                environmentId:
+                  type: string
+                  minLength: 1
+                imageProfile:
+                  type: string
+                  minLength: 1
+                egressProfile:
+                  type: string
+                  minLength: 1
+                t3Image:
+                  type: string
+                  minLength: 1
+                codeServerImage:
+                  type: string
+                  minLength: 1
+                hostedAuth:
+                  type: object
+                  required: [issuer, publicKeysConfigMap]
+                  properties:
+                    issuer:
+                      type: string
+                      minLength: 1
+                    publicKeysConfigMap:
+                      type: string
+                      minLength: 1
+                      maxLength: 253
+                routeHost:
+                  type: string
+                  minLength: 1
+                gpuClass:
+                  type: string
+                  minLength: 1
+                gpuCount:
+                  type: integer
+                  minimum: 1
+                resources:
+                  type: object
+                  required:
+                    - cpuRequest
+                    - cpuLimit
+                    - memoryRequest
+                    - memoryLimit
+                    - ephemeralStorage
+                  properties:
+                    cpuRequest:
+                      type: string
+                      pattern: "^[0-9]+m$"
+                    cpuLimit:
+                      type: string
+                      pattern: "^[0-9]+m$"
+                    memoryRequest:
+                      type: string
+                      pattern: "^[0-9]+$"
+                    memoryLimit:
+                      type: string
+                      pattern: "^[0-9]+$"
+                    ephemeralStorage:
+                      type: string
+                      pattern: "^[0-9]+$"
+            status:
+              type: object
+              properties:
+                observedGeneration:
+                  type: integer
+                  format: int64
+                  minimum: 0
+                observedWorkspaceGeneration:
+                  type: integer
+                  format: int64
+                  minimum: 0
+                phase:
+                  type: string
+                  enum: [Starting, Ready, Stopping, Stopped, Failed, Deleting]
+                podName:
+                  type: string
+                environmentId:
+                  type: string
+                t3Url:
+                  type: string
+                codeServerUrl:
+                  type: string
+                conditions:
+                  type: array
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys: [type]
+                  items:
+                    type: object
+                    required: [type, status, reason, message, lastTransitionTime]
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum: ["True", "False", Unknown]
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      observedGeneration:
+                        type: integer
+                        format: int64
+                        minimum: 0
+                      lastTransitionTime:
+                        type: string
+                        format: date-time

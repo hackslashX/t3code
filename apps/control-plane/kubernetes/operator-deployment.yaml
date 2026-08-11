@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: t3-workspace-operator-egress
+  namespace: t3codes-hosted
+data:
+  egress-cidrs.json: |
+    {
+      "restricted": []
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: t3-workspace-operator
+  namespace: t3codes-hosted
+  labels:
+    app.kubernetes.io/name: t3-workspace-operator
+    app.kubernetes.io/component: operator
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: t3-workspace-operator
+      app.kubernetes.io/component: operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: t3-workspace-operator
+        app.kubernetes.io/component: operator
+    spec:
+      serviceAccountName: t3-workspace-operator
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: operator
+          image: docker.io/hackslashx/t3codes:hosted-control-plane-test
+          imagePullPolicy: IfNotPresent
+          args: [operator]
+          env:
+            - name: T3CODE_WORKSPACE_OPERATOR_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: T3CODE_WORKSPACE_OPERATOR_EGRESS_CIDRS_FILE
+              value: /etc/t3-workspace-operator/egress-cidrs.json
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          volumeMounts:
+            - name: egress
+              mountPath: /etc/t3-workspace-operator
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: egress
+          configMap:
+            name: t3-workspace-operator-egress
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

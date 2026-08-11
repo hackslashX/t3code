@@ -23,19 +23,24 @@ import {
   EnvironmentAuthenticatedPrincipal,
 } from "@t3tools/contracts";
 import type { AuthEnvironmentScope } from "@t3tools/contracts";
-import { parseAllowedOAuthScope } from "@t3tools/shared/oauthScope";
+import { encodeOAuthScope, parseAllowedOAuthScope } from "@t3tools/shared/oauthScope";
 import { causeErrorTag } from "@t3tools/shared/observability";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import { identity } from "effect/Function";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as Cookies from "effect/unstable/http/Cookies";
 import * as HttpEffect from "effect/unstable/http/HttpEffect";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import * as EnvironmentAuth from "./EnvironmentAuth.ts";
+import * as HostedWorkspaceAuthConfig from "./HostedWorkspaceAuthConfig.ts";
+import * as HostedWorkspaceAssertion from "./HostedWorkspaceAssertion.ts";
 import * as SessionStore from "./SessionStore.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import { traceAuthenticatedRelayRequest, traceRelayRequest } from "../cloud/traceRelayRequest.ts";
 import { deriveAuthClientMetadata } from "./utils.ts";
 import { verifyRequestDpopProof } from "./dpop.ts";
@@ -203,6 +208,8 @@ export const authHttpApiLayer = HttpApiBuilder.group(
   Effect.fnUntraced(function* (handlers) {
     const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
     const sessions = yield* SessionStore.SessionStore;
+    const hostedWorkspaceAuth = yield* HostedWorkspaceAuthConfig.HostedWorkspaceAuthConfig;
+    const serverEnvironment = yield* ServerEnvironment.ServerEnvironment;
 
     return handlers
       .handle(
@@ -312,6 +319,83 @@ export const authHttpApiLayer = HttpApiBuilder.group(
           Effect.catchIf(EnvironmentAuth.isServerAuthInvalidRequestError, (error) =>
             failEnvironmentInvalidRequest(EnvironmentAuth.serverAuthInvalidRequestReason(error)),
           ),
+          Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (error) =>
+            failEnvironmentInternal("access_token_issuance_failed", error),
+          ),
+        ),
+      )
+      .handle(
+        "hostedWorkspaceToken",
+        Effect.fn("environment.auth.hostedWorkspaceToken")(
+          function* (args) {
+            yield* annotateEnvironmentRequest(args.endpoint.name);
+            if (!hostedWorkspaceAuth.enabled) {
+              return yield* failEnvironmentAuthInvalid("invalid_credential");
+            }
+            const environmentId = yield* serverEnvironment.getEnvironmentId;
+            const now = yield* DateTime.now;
+            const nowEpochSeconds = Math.floor(now.epochMilliseconds / 1_000);
+            const claims = yield* Effect.try({
+              try: () =>
+                HostedWorkspaceAssertion.decodeHostedWorkspaceAssertion({
+                  assertion: args.payload.assertion,
+                  publicKeys: hostedWorkspaceAuth.publicKeys,
+                  issuer: hostedWorkspaceAuth.issuer,
+                  audience: `urn:t3:environment:${environmentId}`,
+                  workspaceId: hostedWorkspaceAuth.workspaceId,
+                  environmentId,
+                  allowedScopes: new Set(AuthStandardClientScopes),
+                  now: nowEpochSeconds,
+                }),
+              catch: (cause) =>
+                Schema.is(HostedWorkspaceAssertion.HostedWorkspaceAssertionRejectedError)(cause)
+                  ? cause
+                  : new HostedWorkspaceAssertion.HostedWorkspaceAssertionReplayRecordError({
+                      cause,
+                    }),
+            }).pipe(
+              Effect.catchTags({
+                HostedWorkspaceAssertionRejectedError: () =>
+                  failEnvironmentAuthInvalid("invalid_credential"),
+                HostedWorkspaceAssertionReplayRecordError: (error) =>
+                  failEnvironmentInternal("access_token_issuance_failed", error),
+              }),
+            );
+            yield* HostedWorkspaceAssertion.consumeHostedWorkspaceAssertionReplay(claims).pipe(
+              Effect.catchTags({
+                HostedWorkspaceAssertionRejectedError: () =>
+                  failEnvironmentAuthInvalid("invalid_credential"),
+                HostedWorkspaceAssertionReplayRecordError: (error) =>
+                  failEnvironmentInternal("access_token_issuance_failed", error),
+              }),
+            );
+            const session = yield* serverAuth.issueSession({
+              subject: `hosted:${claims.sub}`,
+              scopes: claims.scope,
+              // The assertion is a short-lived, single-use exchange credential. The issued
+              // environment session has its own lifetime so active workspaces do not expire
+              // when the assertion does.
+              ttl: Duration.seconds(hostedWorkspaceAuth.sessionLifetimeSeconds),
+              client: deriveAuthClientMetadata({
+                request: yield* HttpServerRequest.HttpServerRequest,
+                presented: {
+                  ...(args.payload.client_label ? { label: args.payload.client_label } : {}),
+                  ...(args.payload.client_device_type
+                    ? { deviceType: args.payload.client_device_type }
+                    : {}),
+                  ...(args.payload.client_os ? { os: args.payload.client_os } : {}),
+                },
+              }),
+            });
+            yield* appendCredentialResponseHeaders;
+            return {
+              access_token: session.token,
+              issued_token_type: "urn:ietf:params:oauth:token-type:access_token",
+              token_type: "Bearer",
+              expires_in: Math.max(0, claims.exp - nowEpochSeconds),
+              scope: encodeOAuthScope(session.scopes),
+            } as const;
+          },
           Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (error) =>
             failEnvironmentInternal("access_token_issuance_failed", error),
           ),

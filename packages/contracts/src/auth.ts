@@ -46,8 +46,14 @@ export type ServerAuthPolicy = typeof ServerAuthPolicy.Type;
  *   shell can pair the renderer without a login screen
  * - `one-time-token`: a short-lived pairing token, suitable for manual pairing
  *   flows such as `/pair?token=...`
+ * - `hosted-workspace-assertion`: a signed, single-use authorization decision
+ *   issued by a trusted hosted control plane for one execution environment
  */
-export const ServerAuthBootstrapMethod = Schema.Literals(["desktop-bootstrap", "one-time-token"]);
+export const ServerAuthBootstrapMethod = Schema.Literals([
+  "desktop-bootstrap",
+  "one-time-token",
+  "hosted-workspace-assertion",
+]);
 export type ServerAuthBootstrapMethod = typeof ServerAuthBootstrapMethod.Type;
 
 /**
@@ -108,6 +114,30 @@ export const AuthAdministrativeScopes = [
   AuthAccessWriteScope,
   AuthRelayWriteScope,
 ] as const;
+
+export const HostedWorkspaceAssertionType = "t3-hosted-workspace+jwt" as const;
+export const HostedWorkspaceAssertionMaxLifetimeSeconds = 300 as const;
+export const HostedWorkspaceAssertionClaims = Schema.Struct({
+  iss: TrimmedNonEmptyString,
+  aud: TrimmedNonEmptyString,
+  sub: TrimmedNonEmptyString,
+  org: TrimmedNonEmptyString,
+  workspace: TrimmedNonEmptyString,
+  environment: TrimmedNonEmptyString,
+  scope: AuthEnvironmentScopes,
+  iat: Schema.Int,
+  nbf: Schema.Int,
+  exp: Schema.Int,
+  jti: TrimmedNonEmptyString,
+});
+export type HostedWorkspaceAssertionClaims = typeof HostedWorkspaceAssertionClaims.Type;
+
+export const HostedWorkspaceAssertionHeader = Schema.Struct({
+  alg: Schema.Literal("ES256"),
+  kid: TrimmedNonEmptyString,
+  typ: Schema.Literal(HostedWorkspaceAssertionType),
+});
+export type HostedWorkspaceAssertionHeader = typeof HostedWorkspaceAssertionHeader.Type;
 
 export const AuthTokenExchangeGrantType =
   "urn:ietf:params:oauth:grant-type:token-exchange" as const;
@@ -183,6 +213,14 @@ export const AuthTokenExchangeRequest = Schema.Struct({
   client_os: Schema.optionalKey(TrimmedNonEmptyString),
 }).pipe(HttpApiSchema.asFormUrlEncoded());
 export type AuthTokenExchangeRequest = typeof AuthTokenExchangeRequest.Type;
+
+export const AuthHostedWorkspaceTokenRequest = Schema.Struct({
+  assertion: TrimmedNonEmptyString,
+  client_label: Schema.optionalKey(TrimmedNonEmptyString),
+  client_device_type: Schema.optionalKey(AuthClientMetadataDeviceType),
+  client_os: Schema.optionalKey(TrimmedNonEmptyString),
+});
+export type AuthHostedWorkspaceTokenRequest = typeof AuthHostedWorkspaceTokenRequest.Type;
 
 export const AuthAccessTokenResult = Schema.Struct({
   access_token: TrimmedNonEmptyString,

@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: phase0-persistence
+  namespace: t3codes-testing
+  labels:
+    hosted.t3.codes/spike: phase-0
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn-ssd-orion
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: phase0-persistence-writer
+  namespace: t3codes-testing
+  labels:
+    hosted.t3.codes/spike: phase-0
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: writer
+      image: busybox:1.36.1
+      command: ["sh", "-c"]
+      args:
+        - >-
+          set -eu;
+          printf 't3codes-phase0-persistence\n' > /workspace/probe;
+          sync;
+          test "$(cat /workspace/probe)" = t3codes-phase0-persistence
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+          ephemeral-storage: 16Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
+          ephemeral-storage: 64Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+  volumes:
+    - name: workspace
+      persistentVolumeClaim:
+        claimName: phase0-persistence
