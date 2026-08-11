@@ -392,7 +392,10 @@ export const authHttpApiLayer = HttpApiBuilder.group(
               access_token: session.token,
               issued_token_type: "urn:ietf:params:oauth:token-type:access_token",
               token_type: "Bearer",
-              expires_in: Math.max(0, claims.exp - nowEpochSeconds),
+              expires_in: Math.max(
+                0,
+                Math.floor((session.expiresAt.epochMilliseconds - now.epochMilliseconds) / 1_000),
+              ),
               scope: encodeOAuthScope(session.scopes),
             } as const;
           },

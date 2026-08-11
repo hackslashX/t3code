@@ -1634,7 +1634,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       }>(response);
       assert.equal(response.status, 200);
       assert.equal(body.token_type, "Bearer");
-      assert.equal(body.expires_in, 60);
+      assert.isAtLeast(body.expires_in, 43_199);
+      assert.isAtMost(body.expires_in, 43_200);
       assert.equal(body.scope, "orchestration:read terminal:operate");
 
       const sessionUrl = yield* getHttpServerUrl("/api/auth/session");
