@@ -7,6 +7,7 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 import type { T3WorkspaceResource } from "./operator/WorkspaceRenderer.ts";
+import * as WorkspaceCatalog from "./WorkspaceCatalog.ts";
 
 export class WorkspaceProjectionError extends Schema.TaggedErrorClass<WorkspaceProjectionError>()(
   "WorkspaceProjectionError",
@@ -20,8 +21,9 @@ export class WorkspaceProjectionConfig extends Context.Service<
   WorkspaceProjectionConfig,
   {
     readonly namespace: string;
-    readonly t3Image: string;
-    readonly codeServerImage: string;
+    // Kept optional for compatibility with older focused test layers. Images now come from catalog.json.
+    readonly t3Image?: string;
+    readonly codeServerImage?: string;
     readonly hostedAuthIssuer: string;
     readonly hostedAuthPublicKeysConfigMap: string;
   }
@@ -29,8 +31,6 @@ export class WorkspaceProjectionConfig extends Context.Service<
 
 const config = Config.all({
   namespace: Config.string("T3CODE_WORKSPACE_NAMESPACE"),
-  t3Image: Config.string("T3CODE_WORKSPACE_T3_IMAGE"),
-  codeServerImage: Config.string("T3CODE_WORKSPACE_CODE_SERVER_IMAGE"),
   hostedAuthIssuer: Config.string("T3CODE_HOSTED_WORKSPACE_ISSUER"),
   hostedAuthPublicKeysConfigMap: Config.string("T3CODE_HOSTED_WORKSPACE_PUBLIC_KEYS_CONFIG_MAP"),
 });
@@ -98,6 +98,7 @@ export class WorkspaceProjection extends Context.Service<
 export const make = Effect.gen(function* () {
   const sql = yield* PgClient.PgClient;
   const projectionConfig = yield* WorkspaceProjectionConfig;
+  const catalog = yield* WorkspaceCatalog.WorkspaceCatalog;
   const getResource: WorkspaceProjection["Service"]["getResource"] = Effect.fn(
     "WorkspaceProjection.getResource",
   )(function* (workspaceId) {
@@ -124,6 +125,10 @@ export const make = Effect.gen(function* () {
     if (row === undefined) {
       return yield* new WorkspaceProjectionError({ reason: "workspace_not_found" });
     }
+    const profile = catalog.imageProfiles.get(row.image_profile);
+    if (profile === undefined) {
+      return yield* new WorkspaceProjectionError({ reason: "workspace_not_found" });
+    }
     const resource: T3WorkspaceResource = {
       metadata: {
         name: `ws-${row.id}`,
@@ -137,10 +142,11 @@ export const make = Effect.gen(function* () {
         pvcName: row.kubernetes_pvc_name,
         nodeName: row.node_name,
         environmentId: row.environment_id,
-        imageProfile: row.image_profile,
+        imageProfile: profile.id,
+        imageRevision: profile.revision,
         egressProfile: row.egress_profile,
-        t3Image: projectionConfig.t3Image,
-        codeServerImage: projectionConfig.codeServerImage,
+        t3Image: profile.t3Image,
+        codeServerImage: profile.codeServerImage,
         hostedAuth: {
           issuer: projectionConfig.hostedAuthIssuer,
           publicKeysConfigMap: projectionConfig.hostedAuthPublicKeysConfigMap,

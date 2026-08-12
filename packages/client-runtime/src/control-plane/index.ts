@@ -4,12 +4,16 @@ import {
   CreateWorkspaceRequest,
   DeleteWorkspaceRequest,
   ExistingVolumeOption,
+  MigrateWorkspaceRequest,
   OrganizationId,
+  OrganizationMemberSummary,
   RenameOrganizationRequest,
+  UpdateOrganizationMemberRequest,
   RenameOrganizationResponse,
   StorageClassOption,
   UpdateWorkspaceDesiredStateRequest,
   WorkspaceId,
+  WorkspaceImageProfileOption,
   WorkspaceSummary,
 } from "@t3tools/hosted-contracts";
 import * as DateTime from "effect/DateTime";
@@ -34,13 +38,24 @@ const IdentitySummary = Schema.Struct({
 export type IdentitySummary = typeof IdentitySummary.Type;
 
 const WorkspaceList = Schema.Struct({ workspaces: Schema.Array(WorkspaceSummary) });
+const OrganizationMemberList = Schema.Struct({ members: Schema.Array(OrganizationMemberSummary) });
+export type OrganizationMember = typeof OrganizationMemberSummary.Type;
 const WorkspaceResponse = Schema.Struct({ workspace: WorkspaceSummary });
 const StorageOptionsResponse = Schema.Struct({
   nodes: Schema.Array(Schema.String),
+  imageProfiles: Schema.Array(WorkspaceImageProfileOption),
   storageClasses: Schema.Array(StorageClassOption),
   existingVolumes: Schema.Array(ExistingVolumeOption),
 });
 export type StorageOptions = typeof StorageOptionsResponse.Type;
+
+const MigrationResponse = Schema.Struct({
+  workspaceId: WorkspaceId,
+  generation: Schema.Int,
+  imageRevision: Schema.String,
+  changed: Schema.Boolean,
+});
+export type MigrationResult = typeof MigrationResponse.Type;
 
 const DesiredStateResponse = Schema.Struct({
   workspaceId: WorkspaceId,
@@ -146,6 +161,23 @@ export function makeHostedControlPlaneClient(options: HostedControlPlaneClientOp
         method: "PATCH",
         body: JSON.stringify(Schema.encodeSync(RenameOrganizationRequest)(input)),
       }),
+    listMembers: (organizationId: OrganizationId) =>
+      request(`${organizationPath(organizationId)}/members`, OrganizationMemberList).then(
+        ({ members }) => members,
+      ),
+    updateMemberRole: (
+      organizationId: OrganizationId,
+      principalId: string,
+      input: UpdateOrganizationMemberRequest,
+    ) =>
+      requestVoid(
+        `${organizationPath(organizationId)}/members/${encodeURIComponent(principalId)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(Schema.encodeSync(UpdateOrganizationMemberRequest)(input)),
+          headers: { "content-type": "application/json" },
+        },
+      ),
     createInvitation: (
       organizationId: OrganizationId,
       input: CreateOrganizationInvitationRequest,
@@ -168,6 +200,16 @@ export function makeHostedControlPlaneClient(options: HostedControlPlaneClientOp
         method: "POST",
         body: JSON.stringify(Schema.encodeSync(CreateWorkspaceRequest)(input)),
       }).then(({ workspace }) => workspace),
+    migrateImage: (
+      organizationId: OrganizationId,
+      workspaceId: WorkspaceId,
+      input: MigrateWorkspaceRequest,
+    ) =>
+      request(
+        `${organizationPath(organizationId)}/workspaces/${encodeURIComponent(workspaceId)}/migrate-image`,
+        MigrationResponse,
+        { method: "POST", body: JSON.stringify(Schema.encodeSync(MigrateWorkspaceRequest)(input)) },
+      ),
     setDesiredState: (
       organizationId: OrganizationId,
       workspaceId: WorkspaceId,

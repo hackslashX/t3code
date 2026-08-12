@@ -262,7 +262,9 @@ export const layer = (options: WorkspaceRendererOptions) =>
         }
         if (
           current.metadata?.annotations?.["hosted.t3.codes/generation"] !==
-          desired.metadata?.annotations?.["hosted.t3.codes/generation"]
+            desired.metadata?.annotations?.["hosted.t3.codes/generation"] ||
+          current.metadata?.annotations?.["hosted.t3.codes/image-revision"] !==
+            desired.metadata?.annotations?.["hosted.t3.codes/image-revision"]
         ) {
           yield* attempt("deleteOutdatedPod", () =>
             core.deleteNamespacedPod({

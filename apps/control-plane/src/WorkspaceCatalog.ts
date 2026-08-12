@@ -6,8 +6,16 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+export const WorkspaceImageProfile = Schema.Struct({
+  id: Schema.String.pipe(Schema.check(Schema.isNonEmpty())),
+  revision: Schema.String.pipe(Schema.check(Schema.isNonEmpty())),
+  t3Image: Schema.String.pipe(Schema.check(Schema.isNonEmpty())),
+  codeServerImage: Schema.String.pipe(Schema.check(Schema.isNonEmpty())),
+});
+export type WorkspaceImageProfile = typeof WorkspaceImageProfile.Type;
+
 const WorkspaceCatalogDocument = Schema.Struct({
-  imageProfiles: Schema.Array(Schema.String),
+  imageProfiles: Schema.Array(WorkspaceImageProfile),
   egressProfiles: Schema.Array(Schema.String),
   nodes: Schema.Array(Schema.String),
   storageClasses: Schema.Array(StorageClassOption),
@@ -30,7 +38,7 @@ export class WorkspaceCatalogError extends Schema.TaggedErrorClass<WorkspaceCata
 ) {}
 
 export interface WorkspaceCatalogValue {
-  readonly imageProfiles: ReadonlySet<string>;
+  readonly imageProfiles: ReadonlyMap<string, WorkspaceImageProfile>;
   readonly egressProfiles: ReadonlySet<string>;
   readonly nodes: ReadonlySet<string>;
   readonly storageClasses: ReadonlyMap<string, StorageClassOption>;
@@ -53,6 +61,8 @@ export const decodeWorkspaceCatalog = Effect.fn("WorkspaceCatalog.decode")(funct
   );
   if (
     document.imageProfiles.length === 0 ||
+    new Set(document.imageProfiles.map((profile) => profile.id)).size !==
+      document.imageProfiles.length ||
     document.egressProfiles.length === 0 ||
     document.nodes.length === 0 ||
     new Set(document.nodes).size !== document.nodes.length
@@ -64,7 +74,7 @@ export const decodeWorkspaceCatalog = Effect.fn("WorkspaceCatalog.decode")(funct
     return yield* new WorkspaceCatalogError({ reason: "catalog_invalid" });
   }
   return {
-    imageProfiles: new Set(document.imageProfiles),
+    imageProfiles: new Map(document.imageProfiles.map((profile) => [profile.id, profile])),
     egressProfiles: new Set(document.egressProfiles),
     nodes: new Set(document.nodes),
     storageClasses,

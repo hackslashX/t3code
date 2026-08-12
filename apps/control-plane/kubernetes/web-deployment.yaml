@@ -22,7 +22,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: docker.io/hackslashx/t3codes:hosted-web-test
+          image: docker.io/hackslashx/t3codes@sha256:ab4700d92e4b528f47ea987a7f5fd1d74a58751c83929657e753a7b05cc982da
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

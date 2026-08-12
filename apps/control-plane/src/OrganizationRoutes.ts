@@ -1,7 +1,9 @@
 import {
   CreateOrganizationInvitationRequest,
   OrganizationId,
+  PrincipalId,
   RenameOrganizationRequest,
+  UpdateOrganizationMemberRequest,
 } from "@t3tools/hosted-contracts";
 import * as NodeCrypto from "node:crypto";
 import * as Effect from "effect/Effect";
@@ -22,6 +24,7 @@ import { OrganizationRepositoryError } from "./OrganizationRepository.ts";
 import * as OrganizationRepository from "./OrganizationRepository.ts";
 import {
   authenticateMutationRequest,
+  authenticateRequest,
   RequestAuthenticationError,
 } from "./RequestAuthentication.ts";
 
@@ -177,6 +180,69 @@ const revokeInvitationRoute = HttpRouter.add(
   ),
 );
 
+const listMembersRoute = HttpRouter.add(
+  "GET",
+  "/api/organizations/:organizationId/members",
+  mapRouteErrors(
+    Effect.gen(function* () {
+      const params = yield* HttpRouter.params;
+      if (params.organizationId === undefined || !uuidPattern.test(params.organizationId))
+        return errorResponse("organization_not_found", 404);
+      const organizationId = OrganizationId.make(params.organizationId);
+      const authenticated = yield* authenticateRequest();
+      const authorization = yield* OrganizationAuthorization.OrganizationAuthorization;
+      yield* authorization.authorize(
+        authenticated.principalId,
+        organizationId,
+        "organization.read",
+      );
+      const organizations = yield* OrganizationRepository.OrganizationRepository;
+      return HttpServerResponse.jsonUnsafe(
+        { members: yield* organizations.listMembers(organizationId) },
+        { headers },
+      );
+    }),
+  ),
+);
+
+const updateMemberRoute = HttpRouter.add(
+  "PATCH",
+  "/api/organizations/:organizationId/members/:principalId",
+  mapRouteErrors(
+    Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const params = yield* HttpRouter.params;
+      if (
+        params.organizationId === undefined ||
+        params.principalId === undefined ||
+        !uuidPattern.test(params.organizationId) ||
+        !uuidPattern.test(params.principalId)
+      )
+        return errorResponse("organization_not_found", 404);
+      const organizationId = OrganizationId.make(params.organizationId);
+      const authenticated = yield* authenticateMutationRequest();
+      const authorization = yield* OrganizationAuthorization.OrganizationAuthorization;
+      yield* authorization.authorize(
+        authenticated.principalId,
+        organizationId,
+        "membership.manage",
+      );
+      const input = yield* Schema.decodeUnknownEffect(UpdateOrganizationMemberRequest)(
+        yield* request.json,
+      );
+      const organizations = yield* OrganizationRepository.OrganizationRepository;
+      yield* organizations.updateMemberRole(
+        organizationId,
+        PrincipalId.make(params.principalId),
+        input.role,
+        authenticated.principalId,
+        requestId(request),
+      );
+      return HttpServerResponse.empty({ status: 204, headers });
+    }),
+  ),
+);
+
 const renameOrganizationRoute = HttpRouter.add(
   "PATCH",
   "/api/organizations/:organizationId",
@@ -213,5 +279,7 @@ const renameOrganizationRoute = HttpRouter.add(
 export const layer = Layer.mergeAll(
   createInvitationRoute,
   revokeInvitationRoute,
+  listMembersRoute,
+  updateMemberRoute,
   renameOrganizationRoute,
 );

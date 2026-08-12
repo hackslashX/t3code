@@ -6,7 +6,12 @@ metadata:
 data:
   catalog.json: |
     {
-      "imageProfiles": ["stable"],
+      "imageProfiles": [{
+        "id": "stable",
+        "revision": "hosted-20260812114744-workspace",
+        "t3Image": "docker.io/hackslashx/t3codes@sha256:b426e7bff90f367eab02dc25666e784406b1632c26233e99bcbb84338480727e",
+        "codeServerImage": "ghcr.io/coder/code-server@sha256:3623e6362abdec6258472882b06fdeec9d6ce2ad3fda316b3c5d7ed092b89add"
+      }],
       "egressProfiles": ["restricted"],
       "storageClasses": [{
         "name": "longhorn-ssd-orion",
@@ -47,7 +52,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: control-plane
-          image: docker.io/hackslashx/t3codes:hosted-control-plane-test
+          image: docker.io/hackslashx/t3codes@sha256:c1ec4ca6aaa9dc6ee748876e0b8e06df971598dbc53ba4ee395735263d4c2d7e
           imagePullPolicy: IfNotPresent
           args: [start]
           ports:
@@ -75,10 +80,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-            - name: T3CODE_WORKSPACE_T3_IMAGE
-              value: docker.io/hackslashx/t3codes:hosted-workspace-test
-            - name: T3CODE_WORKSPACE_CODE_SERVER_IMAGE
-              value: ghcr.io/coder/code-server@sha256:3623e6362abdec6258472882b06fdeec9d6ce2ad3fda316b3c5d7ed092b89add
             - name: T3CODE_HOSTED_WORKSPACE_ISSUER
               value: https://t3.example.test
             - name: T3CODE_HOSTED_ASSERTION_ISSUER

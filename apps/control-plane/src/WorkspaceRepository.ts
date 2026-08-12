@@ -13,6 +13,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+import * as WorkspaceCatalog from "./WorkspaceCatalog.ts";
+
 export const WorkspaceRepositoryErrorReason = Schema.Literals([
   "organization_quota_missing",
   "workspace_quota_exceeded",
@@ -23,6 +25,7 @@ export const WorkspaceRepositoryErrorReason = Schema.Literals([
   "volume_not_available",
   "workspace_not_found",
   "stale_generation",
+  "image_already_current",
   "imported_volume_delete_forbidden",
   "persistence_failed",
 ]);
@@ -52,6 +55,13 @@ export interface WorkspaceDeletionResult {
   readonly generation: number;
 }
 
+export interface WorkspaceMigrationResult {
+  readonly workspaceId: WorkspaceId;
+  readonly generation: number;
+  readonly imageRevision: string;
+  readonly changed: boolean;
+}
+
 export interface WorkspaceDesiredStateResult {
   readonly workspaceId: WorkspaceId;
   readonly desiredState: "Running" | "Stopped";
@@ -72,6 +82,13 @@ export class WorkspaceRepository extends Context.Service<
       requestId: string,
       request: DeleteWorkspaceRequest,
     ) => Effect.Effect<WorkspaceDeletionResult, WorkspaceRepositoryError>;
+    readonly migrateImage: (
+      workspaceId: WorkspaceId,
+      organizationId: OrganizationId,
+      actorPrincipalId: PrincipalId,
+      requestId: string,
+      expectedGeneration: number,
+    ) => Effect.Effect<WorkspaceMigrationResult, WorkspaceRepositoryError>;
     readonly updateDesiredState: (
       workspaceId: WorkspaceId,
       organizationId: OrganizationId,
@@ -112,6 +129,7 @@ const mapPersistenceError = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
 
 export const make = Effect.gen(function* () {
   const sql = yield* PgClient.PgClient;
+  const catalog = yield* WorkspaceCatalog.WorkspaceCatalog;
 
   const create: WorkspaceRepository["Service"]["create"] = Effect.fn("WorkspaceRepository.create")(
     function* (input) {
@@ -202,14 +220,14 @@ export const make = Effect.gen(function* () {
             yield* sql`
           INSERT INTO workspaces (
             id, organization_id, owner_principal_id, name, slug, desired_state, phase,
-            node_name, environment_id, image_profile, cpu_request_millis, cpu_limit_millis,
+            node_name, environment_id, image_profile, image_revision, cpu_request_millis, cpu_limit_millis,
             memory_request_bytes, memory_limit_bytes, ephemeral_storage_bytes,
             gpu_class, gpu_count, egress_profile, volume_id
           ) VALUES (
             ${input.workspaceId}, ${input.organizationId}, ${input.ownerPrincipalId},
             ${input.request.name}, ${input.slug}, 'Stopped', 'Stopped',
             ${input.request.nodeName}, gen_random_uuid()::text,
-            ${input.request.imageProfile}, ${input.request.resources.cpuRequestMillis},
+            ${input.request.imageProfile}, ${catalog.imageProfiles.get(input.request.imageProfile)?.revision ?? "legacy"}, ${input.request.resources.cpuRequestMillis},
             ${input.request.resources.cpuLimitMillis},
             ${input.request.resources.memoryRequestBytes},
             ${input.request.resources.memoryLimitBytes},
@@ -248,6 +266,60 @@ export const make = Effect.gen(function* () {
         .pipe(mapPersistenceError);
     },
   );
+
+  const migrateImage: WorkspaceRepository["Service"]["migrateImage"] = Effect.fn(
+    "WorkspaceRepository.migrateImage",
+  )(function* (workspaceId, organizationId, actorPrincipalId, requestId, expectedGeneration) {
+    return yield* sql
+      .withTransaction(
+        Effect.gen(function* () {
+          const rows = yield* sql<{
+            readonly generation: string | number;
+            readonly image_profile: string;
+            readonly image_revision: string;
+          }>`
+        SELECT generation, image_profile, image_revision FROM workspaces
+        WHERE id = ${workspaceId} AND organization_id = ${organizationId} AND deleted_at IS NULL FOR UPDATE
+      `;
+          const workspace = rows[0];
+          if (workspace === undefined) return yield* fail("workspace_not_found");
+          const generation = numberValue(workspace.generation);
+          if (generation !== expectedGeneration) return yield* fail("stale_generation");
+          const profile = catalog.imageProfiles.get(workspace.image_profile);
+          if (profile === undefined || profile.revision === workspace.image_revision) {
+            return {
+              workspaceId,
+              generation,
+              imageRevision: workspace.image_revision,
+              changed: false,
+            };
+          }
+          const nextGeneration = generation + 1;
+          yield* sql`
+        UPDATE workspaces SET image_revision = ${profile.revision}, generation = ${nextGeneration},
+          phase = CASE WHEN desired_state = 'Running' THEN 'Starting' ELSE phase END, updated_at = now()
+        WHERE id = ${workspaceId}
+      `;
+          yield* sql`
+        INSERT INTO audit_events (request_id, actor_principal_id, organization_id, action, resource_type, resource_id, result, metadata)
+        VALUES (${requestId}, ${actorPrincipalId}, ${organizationId}, 'workspace.image.migrate', 'workspace', ${workspaceId}, 'allowed',
+          ${sql.json({ imageProfile: profile.id, imageRevision: profile.revision, generation: nextGeneration })})
+      `;
+          yield* sql`
+        INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
+        VALUES ('workspace', ${workspaceId}, 'workspace.image.migrated',
+          ${sql.json({ workspaceId, generation: nextGeneration, imageRevision: profile.revision })})
+      `;
+          return {
+            workspaceId,
+            generation: nextGeneration,
+            imageRevision: profile.revision,
+            changed: true,
+          };
+        }),
+      )
+      .pipe(mapPersistenceError);
+  });
 
   const updateDesiredState: WorkspaceRepository["Service"]["updateDesiredState"] = Effect.fn(
     "WorkspaceRepository.updateDesiredState",
@@ -402,7 +474,12 @@ export const make = Effect.gen(function* () {
       .pipe(mapPersistenceError);
   });
 
-  return WorkspaceRepository.of({ create, delete: deleteWorkspace, updateDesiredState });
+  return WorkspaceRepository.of({
+    create,
+    delete: deleteWorkspace,
+    migrateImage,
+    updateDesiredState,
+  });
 });
 
 export const layer = Layer.effect(WorkspaceRepository, make);

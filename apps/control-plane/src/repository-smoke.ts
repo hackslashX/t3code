@@ -23,6 +23,7 @@ import * as InvitationRepository from "./InvitationRepository.ts";
 import { runMigrations } from "./Migrations.ts";
 import * as OrganizationAuthorization from "./OrganizationAuthorization.ts";
 import * as OutboxRepository from "./OutboxRepository.ts";
+import * as WorkspaceCatalog from "./WorkspaceCatalog.ts";
 import * as WorkspaceRepository from "./WorkspaceRepository.ts";
 import * as WorkspaceStatusRepository from "./WorkspaceStatusRepository.ts";
 import * as WorkspaceVolumeRepository from "./WorkspaceVolumeRepository.ts";
@@ -431,8 +432,28 @@ const program = Effect.gen(function* () {
 });
 
 const DatabaseLayer = Database.layer.pipe(Layer.provideMerge(NodeServices.layer));
+const CatalogLayer = Layer.succeed(
+  WorkspaceCatalog.WorkspaceCatalog,
+  WorkspaceCatalog.WorkspaceCatalog.of({
+    imageProfiles: new Map([
+      [
+        "stable",
+        {
+          id: "stable",
+          revision: "test-1",
+          t3Image: "registry.example/t3:test",
+          codeServerImage: "registry.example/code:test",
+        },
+      ],
+    ]),
+    egressProfiles: new Set(["restricted"]),
+    nodes: new Set(["test-node"]),
+    storageClasses: new Map(),
+    gpuClassMaximums: new Map(),
+  }),
+);
 const RuntimeLayer = Layer.mergeAll(
-  WorkspaceRepository.layer.pipe(Layer.provide(DatabaseLayer)),
+  WorkspaceRepository.layer.pipe(Layer.provide(Layer.merge(DatabaseLayer, CatalogLayer))),
   BrowserSessionStore.layer.pipe(Layer.provide(DatabaseLayer)),
   IdentityRepository.layer.pipe(Layer.provide(DatabaseLayer)),
   IdentityQuery.layer.pipe(Layer.provide(DatabaseLayer)),

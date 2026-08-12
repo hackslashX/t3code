@@ -23,6 +23,7 @@ export interface WorkspaceSummary {
   readonly observedGeneration: number;
   readonly nodeName: string;
   readonly imageProfile: string;
+  readonly imageRevision: string;
   readonly routeHost?: string;
   readonly environmentId?: string;
   readonly failureReason?: string;
@@ -41,6 +42,7 @@ interface WorkspaceRow {
   readonly observed_generation: string | number;
   readonly node_name: string;
   readonly image_profile: string;
+  readonly image_revision: string;
   readonly route_host: string | null;
   readonly environment_id: string | null;
   readonly failure_reason: string | null;
@@ -59,6 +61,7 @@ const mapRow = (row: WorkspaceRow): WorkspaceSummary => ({
   observedGeneration: Number(row.observed_generation),
   nodeName: row.node_name,
   imageProfile: row.image_profile,
+  imageRevision: row.image_revision,
   ...(row.route_host === null ? {} : { routeHost: row.route_host }),
   ...(row.environment_id === null ? {} : { environmentId: row.environment_id }),
   ...(row.failure_reason === null ? {} : { failureReason: row.failure_reason }),
@@ -85,7 +88,7 @@ export const make = Effect.gen(function* () {
   const select = (organizationId: OrganizationId, workspaceId?: WorkspaceId) =>
     sql<WorkspaceRow>`
       SELECT id, name, slug, desired_state, phase, generation, observed_generation,
-             node_name, image_profile, route_host, environment_id, failure_reason, failure_message,
+             node_name, image_profile, image_revision, route_host, environment_id, failure_reason, failure_message,
              created_at, updated_at
       FROM workspaces
       WHERE organization_id = ${organizationId} AND deleted_at IS NULL

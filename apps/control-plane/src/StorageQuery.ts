@@ -3,6 +3,7 @@ import {
   type ExistingVolumeOption,
   type OrganizationId,
   type StorageClassOption,
+  type WorkspaceImageProfileOption,
 } from "@t3tools/hosted-contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -21,6 +22,7 @@ export class StorageQueryError extends Schema.TaggedErrorClass<StorageQueryError
 
 export interface StorageOptions {
   readonly nodes: ReadonlyArray<string>;
+  readonly imageProfiles: ReadonlyArray<WorkspaceImageProfileOption>;
   readonly storageClasses: ReadonlyArray<StorageClassOption>;
   readonly existingVolumes: ReadonlyArray<ExistingVolumeOption>;
 }
@@ -55,6 +57,10 @@ export const make = Effect.gen(function* () {
       );
       return {
         nodes: [...catalog.nodes],
+        imageProfiles: [...catalog.imageProfiles.values()].map(({ id, revision }) => ({
+          id,
+          revision,
+        })),
         storageClasses: [...catalog.storageClasses.values()],
         existingVolumes: rows.map((row) => ({
           id: row.id,

@@ -87,6 +87,21 @@ export const OrganizationMembership = Schema.Struct({
 });
 export type OrganizationMembership = typeof OrganizationMembership.Type;
 
+export const OrganizationMemberSummary = Schema.Struct({
+  principalId: PrincipalId,
+  displayName: TrimmedNonEmptyString,
+  email: TrimmedNonEmptyString,
+  avatarUrl: Schema.optionalKey(Schema.String),
+  role: OrganizationRole,
+  status: MembershipStatus,
+});
+export type OrganizationMemberSummary = typeof OrganizationMemberSummary.Type;
+
+export const UpdateOrganizationMemberRequest = Schema.Struct({
+  role: Schema.Literals(["admin", "member", "viewer"]),
+});
+export type UpdateOrganizationMemberRequest = typeof UpdateOrganizationMemberRequest.Type;
+
 const PositiveInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1));
 const NonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
@@ -198,6 +213,7 @@ export const WorkspaceSummary = Schema.Struct({
   observedGeneration: NonNegativeInt,
   nodeName: TrimmedNonEmptyString,
   imageProfile: TrimmedNonEmptyString,
+  imageRevision: TrimmedNonEmptyString,
   routeHost: Schema.optionalKey(TrimmedNonEmptyString),
   environmentId: Schema.optionalKey(TrimmedNonEmptyString),
   failureReason: Schema.optionalKey(TrimmedNonEmptyString),
@@ -209,6 +225,11 @@ export type WorkspaceSummary = typeof WorkspaceSummary.Type;
 
 export const CreateWorkspaceRequest = WorkspaceSpec;
 export type CreateWorkspaceRequest = typeof CreateWorkspaceRequest.Type;
+
+export const MigrateWorkspaceRequest = Schema.Struct({
+  expectedGeneration: NonNegativeInt,
+});
+export type MigrateWorkspaceRequest = typeof MigrateWorkspaceRequest.Type;
 
 export const UpdateWorkspaceDesiredStateRequest = Schema.Struct({
   desiredState: WorkspaceDesiredState,
@@ -235,6 +256,12 @@ export const OrganizationQuota = Schema.Struct({
   maxGpuByClass: Schema.Record(TrimmedNonEmptyString, NonNegativeInt),
 });
 export type OrganizationQuota = typeof OrganizationQuota.Type;
+
+export const WorkspaceImageProfileOption = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  revision: TrimmedNonEmptyString,
+});
+export type WorkspaceImageProfileOption = typeof WorkspaceImageProfileOption.Type;
 
 export const StorageClassOption = Schema.Struct({
   name: TrimmedNonEmptyString,

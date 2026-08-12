@@ -1,6 +1,7 @@
 import {
   CreateWorkspaceRequest,
   DeleteWorkspaceRequest,
+  MigrateWorkspaceRequest,
   OrganizationId,
   UpdateWorkspaceDesiredStateRequest,
   WorkspaceId,
@@ -216,6 +217,39 @@ const createRoute = HttpRouter.add(
   ),
 );
 
+const migrateImageRoute = HttpRouter.add(
+  "POST",
+  "/api/organizations/:organizationId/workspaces/:workspaceId/migrate-image",
+  mapErrors(
+    Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const params = yield* HttpRouter.params;
+      const organizationId = yield* organizationParam;
+      if (
+        organizationId === undefined ||
+        params.workspaceId === undefined ||
+        !uuidPattern.test(params.workspaceId)
+      )
+        return errorResponse("workspace_not_found", 404);
+      const authenticated = yield* authenticateMutationRequest();
+      yield* (yield* OrganizationAuthorization.OrganizationAuthorization).authorize(
+        authenticated.principalId,
+        organizationId,
+        "workspace.update",
+      );
+      const input = yield* Schema.decodeUnknownEffect(MigrateWorkspaceRequest)(yield* request.json);
+      const result = yield* (yield* WorkspaceRepository.WorkspaceRepository).migrateImage(
+        WorkspaceId.make(params.workspaceId),
+        organizationId,
+        authenticated.principalId,
+        requestId(request),
+        input.expectedGeneration,
+      );
+      return HttpServerResponse.jsonUnsafe(result, { headers });
+    }),
+  ),
+);
+
 const desiredStateRoute = HttpRouter.add(
   "POST",
   "/api/organizations/:organizationId/workspaces/:workspaceId/desired-state",
@@ -406,6 +440,7 @@ export const layer = Layer.mergeAll(
   listRoute,
   getRoute,
   createRoute,
+  migrateImageRoute,
   desiredStateRoute,
   accessAssertionRoute,
   proxySessionRoute,

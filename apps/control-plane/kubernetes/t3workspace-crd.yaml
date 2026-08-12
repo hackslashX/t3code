@@ -46,6 +46,7 @@ spec:
                 - nodeName
                 - environmentId
                 - imageProfile
+                - imageRevision
                 - egressProfile
                 - t3Image
                 - codeServerImage
@@ -87,6 +88,9 @@ spec:
                   type: string
                   minLength: 1
                 imageProfile:
+                  type: string
+                  minLength: 1
+                imageRevision:
                   type: string
                   minLength: 1
                 egressProfile:

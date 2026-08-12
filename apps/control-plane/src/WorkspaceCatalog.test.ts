@@ -6,7 +6,12 @@ import { decodeWorkspaceCatalog } from "./WorkspaceCatalog.ts";
 it.effect("decodes the mounted workspace catalog", () =>
   Effect.gen(function* () {
     const catalog = yield* decodeWorkspaceCatalog(`{
-      "imageProfiles": ["stable"],
+      "imageProfiles": [{
+        "id": "stable",
+        "revision": "stable-1",
+        "t3Image": "registry.example/t3@sha256:test",
+        "codeServerImage": "registry.example/code@sha256:test"
+      }],
       "egressProfiles": ["restricted"],
       "nodes": ["orion", "atlas"],
       "storageClasses": [{
@@ -20,7 +25,7 @@ it.effect("decodes the mounted workspace catalog", () =>
       }],
       "gpuClasses": []
     }`);
-    assert.isTrue(catalog.imageProfiles.has("stable"));
+    assert.equal(catalog.imageProfiles.get("stable")?.revision, "stable-1");
     assert.equal(catalog.storageClasses.get("longhorn-ssd-orion")?.bindingMode, "Immediate");
   }),
 );

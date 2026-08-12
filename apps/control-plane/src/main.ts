@@ -67,13 +67,15 @@ const ServicesLayer = Layer.mergeAll(
   OutboxRepository.layer.pipe(Layer.provide(DatabaseLayer)),
   StorageQuery.layer.pipe(Layer.provide(Layer.merge(DatabaseLayer, CatalogLayer))),
   WorkspaceAdmission.layer.pipe(Layer.provide(Layer.merge(DatabaseLayer, CatalogLayer))),
-  WorkspaceProjection.layer.pipe(Layer.provide(Layer.merge(DatabaseLayer, ProjectionConfigLayer))),
+  WorkspaceProjection.layer.pipe(
+    Layer.provide(Layer.mergeAll(DatabaseLayer, ProjectionConfigLayer, CatalogLayer)),
+  ),
   WorkspaceProxySession.sessionLayer.pipe(Layer.provide(NodeServices.layer)),
   WorkspaceProxySession.tokenExchangeLayer.pipe(
     Layer.provide(Layer.merge(ProjectionConfigLayer, FetchHttpClient.layer)),
   ),
   WorkspaceQuery.layer.pipe(Layer.provide(DatabaseLayer)),
-  WorkspaceRepository.layer.pipe(Layer.provide(DatabaseLayer)),
+  WorkspaceRepository.layer.pipe(Layer.provide(Layer.merge(DatabaseLayer, CatalogLayer))),
   WorkspaceResourcePublisher.layer.pipe(Layer.provide(KubernetesConfigLayer)),
   WorkspaceStatusRepository.layer.pipe(Layer.provide(DatabaseLayer)),
   WorkspaceVolumeRepository.layer.pipe(Layer.provide(DatabaseLayer)),

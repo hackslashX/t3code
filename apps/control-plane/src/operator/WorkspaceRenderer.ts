@@ -16,6 +16,7 @@ export interface T3WorkspaceResource {
     readonly nodeName: string;
     readonly environmentId: string;
     readonly imageProfile: string;
+    readonly imageRevision?: string;
     readonly egressProfile: string;
     readonly t3Image: string;
     readonly codeServerImage: string;
@@ -88,6 +89,8 @@ export function renderWorkspaceResources(
             labels,
             annotations: {
               "hosted.t3.codes/generation": String(workspace.metadata.generation ?? 0),
+              "hosted.t3.codes/image-revision":
+                workspace.spec.imageRevision ?? workspace.spec.imageProfile,
             },
             ownerReferences,
           },

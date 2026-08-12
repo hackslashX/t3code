@@ -123,7 +123,7 @@ export const make = Effect.gen(function* () {
           storageBytes: numberValue(usage?.storage_bytes),
           gpuByClass: new Map(gpuRows.map((gpu) => [gpu.gpu_class, numberValue(gpu.count)])),
         },
-        imageProfiles: catalog.imageProfiles,
+        imageProfiles: new Set(catalog.imageProfiles.keys()),
         egressProfiles: catalog.egressProfiles,
         nodes: catalog.nodes,
         storageClasses: catalog.storageClasses,

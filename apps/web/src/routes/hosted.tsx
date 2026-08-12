@@ -3,6 +3,7 @@ import {
   HostedControlPlaneError,
   makeHostedControlPlaneClient,
   type IdentitySummary,
+  type OrganizationMember,
   type StorageOptions,
 } from "@t3tools/client-runtime/control-plane";
 import type {
@@ -26,7 +27,6 @@ import {
   Play,
   Plus,
   RefreshCw,
-  Settings,
   Square,
   Trash2,
   Users,
@@ -38,6 +38,23 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+import {
+  Select,
+  SelectGroup,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "../components/ui/dialog";
 import { T3Wordmark } from "../components/sidebar/SidebarChrome";
 import {
   SettingsPageContainer,
@@ -122,6 +139,8 @@ export function HostedDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [busyWorkspaceId, setBusyWorkspaceId] = useState<string>();
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteWorkspace, setDeleteWorkspace] = useState<WorkspaceSummary>();
+  const [migrationWorkspace, setMigrationWorkspace] = useState<WorkspaceSummary>();
   const [error, setError] = useState<string>();
 
   const organization = identity?.organizations.find((item) => item.id === organizationId);
@@ -184,6 +203,23 @@ export function HostedDashboard() {
     }
   };
 
+  const applyImageMigration = async (workspace: WorkspaceSummary) => {
+    if (organizationId === undefined) return;
+    setBusyWorkspaceId(workspace.id);
+    setError(undefined);
+    try {
+      await client.migrateImage(organizationId, workspace.id, {
+        expectedGeneration: workspace.generation,
+      });
+      await loadOrganization();
+    } catch (cause) {
+      setError(messageFor(cause, "Unable to migrate workspace image."));
+    } finally {
+      setBusyWorkspaceId(undefined);
+      setMigrationWorkspace(undefined);
+    }
+  };
+
   const openWorkspace = async (workspace: WorkspaceSummary, target: "t3" | "code") => {
     if (organizationId === undefined) return;
     const workspaceTab = window.open("about:blank", "_blank");
@@ -205,20 +241,16 @@ export function HostedDashboard() {
     }
   };
 
-  const deleteWorkspace = async (workspace: WorkspaceSummary) => {
+  const confirmDeleteWorkspace = async (
+    workspace: WorkspaceSummary,
+    volumePolicy: "retain" | "delete",
+  ) => {
     if (organizationId === undefined) return;
-    const deleteVolume = window.confirm(
-      `Delete “${workspace.name}”?\n\nSelect OK to also delete its managed storage. Select Cancel to keep everything.`,
-    );
-    if (!deleteVolume) {
-      const retain = window.confirm(`Keep storage but delete “${workspace.name}”?`);
-      if (!retain) return;
-    }
     setBusyWorkspaceId(workspace.id);
     setError(undefined);
     try {
       await client.deleteWorkspace(organizationId, workspace.id, {
-        volumePolicy: deleteVolume ? "delete" : "retain",
+        volumePolicy,
         expectedGeneration: workspace.generation,
       });
       await loadOrganization();
@@ -226,6 +258,7 @@ export function HostedDashboard() {
       setError(messageFor(cause, "Unable to delete workspace."));
     } finally {
       setBusyWorkspaceId(undefined);
+      setDeleteWorkspace(undefined);
     }
   };
 
@@ -254,15 +287,7 @@ export function HostedDashboard() {
             COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
           )}
         >
-          <SidebarTrigger />
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-semibold">
-              {navigation.find((item) => item.id === section)?.label}
-            </h1>
-            <p className="truncate text-xs text-muted-foreground">
-              {organization?.name ?? "Loading organization…"}
-            </p>
-          </div>
+          <div className="flex-1" />
           {section === "workspaces" ? (
             <>
               <Button
@@ -311,12 +336,14 @@ export function HostedDashboard() {
             <WorkspacesSection
               organization={organization}
               workspaces={workspaces}
+              imageProfiles={storage?.imageProfiles ?? []}
               loading={loading}
               busyWorkspaceId={busyWorkspaceId}
               onCreate={() => setCreateOpen(true)}
               onDesiredState={setDesiredState}
+              onMigrate={setMigrationWorkspace}
               onOpen={openWorkspace}
-              onDelete={deleteWorkspace}
+              onDelete={setDeleteWorkspace}
             />
           ) : null}
           {organization !== undefined && section === "storage" ? (
@@ -337,6 +364,22 @@ export function HostedDashboard() {
         </SettingsPageContainer>
       </SidebarInset>
 
+      {migrationWorkspace !== undefined ? (
+        <MigrateWorkspaceDialog
+          workspace={migrationWorkspace}
+          busy={busyWorkspaceId === migrationWorkspace.id}
+          onClose={() => setMigrationWorkspace(undefined)}
+          onConfirm={() => void applyImageMigration(migrationWorkspace)}
+        />
+      ) : null}
+      {deleteWorkspace !== undefined ? (
+        <DeleteWorkspaceDialog
+          workspace={deleteWorkspace}
+          busy={busyWorkspaceId === deleteWorkspace.id}
+          onClose={() => setDeleteWorkspace(undefined)}
+          onConfirm={(volumePolicy) => void confirmDeleteWorkspace(deleteWorkspace, volumePolicy)}
+        />
+      ) : null}
       {createOpen && organizationId !== undefined && storage !== undefined ? (
         <CreateWorkspacePanel
           organizationId={organizationId}
@@ -377,16 +420,16 @@ function HostedSidebar({
   return (
     <Sidebar
       side="left"
-      collapsible="offcanvas"
+      collapsible="icon"
       data-app-sidebar=""
       className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
     >
       <SidebarHeader className="h-[var(--workspace-topbar-height)] shrink-0 flex-row items-center px-3 py-0">
-        <SidebarTrigger className="md:hidden" />
+        <SidebarTrigger className="shrink-0" />
         <a
           href="/"
           aria-label="T3 Code K8s dashboard"
-          className="sidebar-brand ml-[var(--workspace-titlebar-content-left)] flex h-7 min-w-0 items-center gap-1 rounded-md outline-hidden ring-ring focus-visible:ring-2"
+          className="sidebar-brand flex h-7 min-w-0 items-center gap-1 rounded-md outline-hidden ring-ring focus-visible:ring-2"
         >
           <T3Wordmark />
           <span className="truncate text-sm font-medium tracking-tight text-muted-foreground">
@@ -614,19 +657,23 @@ function PhaseBadge({ phase }: { readonly phase: WorkspaceSummary["phase"] }) {
 function WorkspacesSection({
   organization,
   workspaces,
+  imageProfiles,
   loading,
   busyWorkspaceId,
   onCreate,
   onDesiredState,
+  onMigrate,
   onOpen,
   onDelete,
 }: {
   readonly organization: OrganizationSummary;
   readonly workspaces: ReadonlyArray<WorkspaceSummary>;
+  readonly imageProfiles: ReadonlyArray<{ readonly id: string; readonly revision: string }>;
   readonly loading: boolean;
   readonly busyWorkspaceId: string | undefined;
   readonly onCreate: () => void;
   readonly onDesiredState: (workspace: WorkspaceSummary) => void;
+  readonly onMigrate: (workspace: WorkspaceSummary) => void;
   readonly onOpen: (workspace: WorkspaceSummary, target: "t3" | "code") => void;
   readonly onDelete: (workspace: WorkspaceSummary) => void;
 }) {
@@ -645,6 +692,11 @@ function WorkspacesSection({
         const busy = busyWorkspaceId === workspace.id;
         const ready = workspace.phase === "Ready";
         const expanded = expandedWorkspaceId === workspace.id;
+        const deployedRevision = imageProfiles.find(
+          (profile) => profile.id === workspace.imageProfile,
+        )?.revision;
+        const migrationAvailable =
+          deployedRevision !== undefined && deployedRevision !== workspace.imageRevision;
         return (
           <SettingsRow
             key={workspace.id}
@@ -669,6 +721,16 @@ function WorkspacesSection({
                 >
                   {expanded ? "Hide details" : "Details"}
                 </Button>
+                {migrationAvailable ? (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => onMigrate(workspace)}
+                  >
+                    <RefreshCw /> Migrate
+                  </Button>
+                ) : null}
                 <Button
                   size="xs"
                   variant="outline"
@@ -718,7 +780,7 @@ function WorkspaceDetails({ workspace }: { readonly workspace: WorkspaceSummary 
     ["Target node", workspace.nodeName],
     ["Environment ID", workspace.environmentId ?? "Not assigned"],
     ["Route host", workspace.routeHost ?? "Not assigned"],
-    ["Image profile", workspace.imageProfile],
+    ["Image profile", `${workspace.imageProfile} · ${workspace.imageRevision}`],
     ["Failure reason", workspace.failureReason ?? "None"],
   ] as const;
   return (
@@ -783,7 +845,16 @@ function TeamSection({
   const [role, setRole] = useState<"admin" | "member" | "viewer">("member");
   const [busy, setBusy] = useState(false);
   const [inviteLink, setInviteLink] = useState<string>();
+  const [members, setMembers] = useState<ReadonlyArray<OrganizationMember>>([]);
   const [error, setError] = useState<string>();
+  const loadMembers = useCallback(async () => {
+    try {
+      setMembers(await client.listMembers(organizationId));
+    } catch (cause) {
+      setError(messageFor(cause, "Unable to load members."));
+    }
+  }, [organizationId]);
+  useEffect(() => void loadMembers(), [loadMembers]);
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
@@ -865,11 +936,42 @@ function TeamSection({
         />
       )}
       <SettingsSection title="Members" icon={<Users className="size-4" />}>
-        <SettingsRow
-          title="Member directory"
-          description="Membership listing and role editing will appear here when exposed by the control-plane API."
-          control={<Badge variant="secondary">Coming soon</Badge>}
-        />
+        {members.map((member) => (
+          <SettingsRow
+            key={member.principalId}
+            title={member.displayName}
+            description={member.email}
+            status={member.status === "active" ? undefined : member.status}
+            control={
+              roleCanAdminister(organization.role) && member.role !== "owner" ? (
+                <select
+                  aria-label={`${member.displayName} role`}
+                  className="h-8 rounded-lg border bg-background px-2 text-xs"
+                  value={member.role}
+                  onChange={(event) =>
+                    void client
+                      .updateMemberRole(organizationId, member.principalId, {
+                        role: event.target.value as "admin" | "member" | "viewer",
+                      })
+                      .then(loadMembers)
+                      .catch((cause) => setError(messageFor(cause, "Unable to update member.")))
+                  }
+                >
+                  <option value="admin">Admin</option>
+                  <option value="member">Member</option>
+                  <option value="viewer">Viewer</option>
+                </select>
+              ) : (
+                <Badge variant="outline" className="capitalize">
+                  {member.role}
+                </Badge>
+              )
+            }
+          />
+        ))}
+        {members.length === 0 ? (
+          <SettingsRow title="No members" description="Invite teammates to build together." />
+        ) : null}
       </SettingsSection>
     </div>
   );
@@ -949,14 +1051,87 @@ function OrganizationSection({
           }
         />
       </SettingsSection>
-      <SettingsSection title="Administration" icon={<Settings className="size-4" />}>
-        <SettingsRow
-          title="Organization management"
-          description="Renaming, quotas, and ownership transfer will appear here when their control-plane APIs are available."
-          control={<Badge variant="secondary">Coming soon</Badge>}
-        />
-      </SettingsSection>
     </div>
+  );
+}
+
+function MigrateWorkspaceDialog({
+  workspace,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  readonly workspace: WorkspaceSummary;
+  readonly busy: boolean;
+  readonly onClose: () => void;
+  readonly onConfirm: () => void;
+}) {
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogPopup className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Migrate {workspace.name}?</DialogTitle>
+          <DialogDescription>
+            Update to the deployed {workspace.imageProfile} image revision.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogPanel>
+          <p className="text-sm text-muted-foreground">
+            A running workspace restarts. Active T3 Code and VS Code sessions disconnect.
+          </p>
+        </DialogPanel>
+        <DialogFooter>
+          <Button variant="outline" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button disabled={busy} onClick={onConfirm}>
+            {busy ? <LoaderCircle className="animate-spin" /> : <RefreshCw />} Migrate workspace
+          </Button>
+        </DialogFooter>
+      </DialogPopup>
+    </Dialog>
+  );
+}
+
+function DeleteWorkspaceDialog({
+  workspace,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  readonly workspace: WorkspaceSummary;
+  readonly busy: boolean;
+  readonly onClose: () => void;
+  readonly onConfirm: (volumePolicy: "retain" | "delete") => void;
+}) {
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogPopup className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete {workspace.name}?</DialogTitle>
+          <DialogDescription>
+            Choose whether to retain its persistent volume for a later workspace.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogPanel className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Deleting the workspace stops its environment and removes its route. This cannot be
+            undone.
+          </p>
+        </DialogPanel>
+        <DialogFooter>
+          <Button variant="outline" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="outline" disabled={busy} onClick={() => onConfirm("retain")}>
+            Retain volume
+          </Button>
+          <Button variant="destructive" disabled={busy} onClick={() => onConfirm("delete")}>
+            {busy ? <LoaderCircle className="animate-spin" /> : <Trash2 />} Delete volume
+          </Button>
+        </DialogFooter>
+      </DialogPopup>
+    </Dialog>
   );
 }
 
@@ -1030,168 +1205,185 @@ function CreateWorkspacePanel({
     }
   };
   return (
-    <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/45"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <section className="h-full w-full max-w-xl overflow-y-auto bg-background shadow-2xl">
-        <div className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background px-6">
-          <div>
-            <h2 className="font-semibold">Create workspace</h2>
-            <p className="text-xs text-muted-foreground">
-              Provision T3 Code and VS Code with persistent storage.
-            </p>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X />
-          </Button>
-        </div>
-        <form className="space-y-7 p-6" onSubmit={(event) => void submit(event)}>
-          <Field label="Workspace name" description="A friendly name shown to your team.">
-            <Input
-              required
-              autoFocus
-              placeholder="My workspace"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="CPU limit" description="Millicores">
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogPopup className="max-w-xl overflow-hidden">
+        <DialogHeader>
+          <DialogTitle>Create workspace</DialogTitle>
+          <DialogDescription>
+            Provision T3 Code and VS Code with persistent storage.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogPanel className="max-h-[65vh] space-y-7" scrollFade={false}>
+          <form className="space-y-7" onSubmit={(event) => void submit(event)}>
+            <Field label="Workspace name" description="A friendly name shown to your team.">
               <Input
-                type="number"
-                min={250}
-                max={16000}
-                step={250}
-                value={cpuLimit}
-                onChange={(event) => setCpuLimit(Number(event.target.value))}
+                required
+                autoFocus
+                placeholder="My workspace"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
               />
             </Field>
-            <Field label="Memory limit" description="GiB">
-              <Input
-                type="number"
-                min={1}
-                max={64}
-                value={memoryGiB}
-                onChange={(event) => setMemoryGiB(Number(event.target.value))}
-              />
-            </Field>
-          </div>
-          <Field label="Target node" description="Kubernetes node for this workspace.">
-            <select
-              required
-              className="h-9 w-full rounded-lg border bg-background px-3 text-sm"
-              value={nodeName}
-              onChange={(event) => setNodeName(event.target.value)}
-            >
-              {storage.nodes.map((node) => (
-                <option key={node} value={node}>
-                  {node}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field
-            label="Storage source"
-            description="Create a volume or attach an available retained volume."
-          >
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant={storageKind === "new" ? "default" : "outline"}
-                onClick={() => setStorageKind("new")}
-              >
-                <HardDrive /> New volume
-              </Button>
-              <Button
-                type="button"
-                variant={storageKind === "existing" ? "default" : "outline"}
-                disabled={!storage.existingVolumes.some((item) => item.status === "available")}
-                onClick={() => setStorageKind("existing")}
-              >
-                <Database /> Existing
-              </Button>
-            </div>
-          </Field>
-          {storageKind === "new" ? (
-            <>
-              <Field label="Storage class">
-                <select
-                  required
-                  className="h-9 w-full rounded-lg border bg-background px-3 text-sm"
-                  value={storageClass}
-                  onChange={(event) => setStorageClass(event.target.value)}
-                >
-                  {storage.storageClasses.map((item) => (
-                    <option key={item.name} value={item.name}>
-                      {item.name}
-                      {item.isDefault ? " (default)" : ""}
-                    </option>
-                  ))}
-                </select>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="CPU limit" description="Millicores">
+                <Input
+                  type="number"
+                  min={250}
+                  max={16000}
+                  step={250}
+                  value={cpuLimit}
+                  onChange={(event) => setCpuLimit(Number(event.target.value))}
+                />
               </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Volume size" description="GiB">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={1024}
-                    value={sizeGiB}
-                    onChange={(event) => setSizeGiB(Number(event.target.value))}
+              <Field label="Memory limit" description="GiB">
+                <Input
+                  type="number"
+                  min={1}
+                  max={64}
+                  value={memoryGiB}
+                  onChange={(event) => setMemoryGiB(Number(event.target.value))}
+                />
+              </Field>
+            </div>
+            <Field label="Target node" description="Kubernetes node for this workspace.">
+              <HostedSelect
+                ariaLabel="Target node"
+                value={nodeName}
+                onValueChange={setNodeName}
+                options={storage.nodes.map((node) => ({ value: node, label: node }))}
+              />
+            </Field>
+            <Field
+              label="Storage source"
+              description="Create a volume or attach an available retained volume."
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={storageKind === "new" ? "default" : "outline"}
+                  onClick={() => setStorageKind("new")}
+                >
+                  <HardDrive /> New volume
+                </Button>
+                <Button
+                  type="button"
+                  variant={storageKind === "existing" ? "default" : "outline"}
+                  disabled={!storage.existingVolumes.some((item) => item.status === "available")}
+                  onClick={() => setStorageKind("existing")}
+                >
+                  <Database /> Existing
+                </Button>
+              </div>
+            </Field>
+            {storageKind === "new" ? (
+              <>
+                <Field label="Storage class">
+                  <HostedSelect
+                    ariaLabel="Storage class"
+                    value={storageClass}
+                    onValueChange={setStorageClass}
+                    options={storage.storageClasses.map((item) => ({
+                      value: item.name,
+                      label: `${item.name}${item.isDefault ? " (default)" : ""}`,
+                    }))}
                   />
                 </Field>
-                <Field label="On workspace deletion">
-                  <select
-                    className="h-9 w-full rounded-lg border bg-background px-3 text-sm"
-                    value={retentionPolicy}
-                    onChange={(event) =>
-                      setRetentionPolicy(event.target.value as typeof retentionPolicy)
-                    }
-                  >
-                    <option value="retain">Retain volume</option>
-                    <option value="delete">Delete volume</option>
-                  </select>
-                </Field>
-              </div>
-            </>
-          ) : (
-            <Field label="Existing volume">
-              <select
-                required
-                className="h-9 w-full rounded-lg border bg-background px-3 text-sm"
-                value={volumeId}
-                onChange={(event) => setVolumeId(event.target.value)}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Volume size" description="GiB">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={1024}
+                      value={sizeGiB}
+                      onChange={(event) => setSizeGiB(Number(event.target.value))}
+                    />
+                  </Field>
+                  <Field label="On workspace deletion">
+                    <HostedSelect
+                      ariaLabel="Storage retention policy"
+                      value={retentionPolicy}
+                      onValueChange={(value) => setRetentionPolicy(value as typeof retentionPolicy)}
+                      options={[
+                        { value: "retain", label: "Retain volume" },
+                        { value: "delete", label: "Delete volume" },
+                      ]}
+                    />
+                  </Field>
+                </div>
+              </>
+            ) : (
+              <Field label="Existing volume">
+                <HostedSelect
+                  ariaLabel="Existing volume"
+                  value={volumeId}
+                  onValueChange={setVolumeId}
+                  options={storage.existingVolumes
+                    .filter((item) => item.status === "available")
+                    .map((item) => ({
+                      value: item.id,
+                      label: `${item.id} · ${Math.round(item.capacityBytes / gibibyte)} GiB`,
+                    }))}
+                />
+              </Field>
+            )}
+            <div className="rounded-xl bg-muted/50 p-4 text-xs text-muted-foreground">
+              <strong className="text-foreground">Runtime profile:</strong> stable image · internet
+              egress egress · ReadWriteOnce storage
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  busy || !name.trim() || (storageKind === "new" ? !storageClass : !volumeId)
+                }
               >
-                {storage.existingVolumes
-                  .filter((item) => item.status === "available")
-                  .map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.id} · {Math.round(item.capacityBytes / gibibyte)} GiB
-                    </option>
-                  ))}
-              </select>
-            </Field>
-          )}
-          <div className="rounded-xl bg-muted/50 p-4 text-xs text-muted-foreground">
-            <strong className="text-foreground">Runtime profile:</strong> stable image · internet
-            egress egress · ReadWriteOnce storage
-          </div>
-          <div className="flex justify-end gap-2 border-t pt-6">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={busy || !name.trim() || (storageKind === "new" ? !storageClass : !volumeId)}
-            >
-              {busy ? <LoaderCircle className="animate-spin" /> : <Plus />} Create workspace
-            </Button>
-          </div>
-        </form>
-      </section>
-    </div>
+                {busy ? <LoaderCircle className="animate-spin" /> : <Plus />} Create workspace
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogPanel>
+      </DialogPopup>
+    </Dialog>
+  );
+}
+
+function HostedSelect({
+  value,
+  onValueChange,
+  options,
+  ariaLabel,
+  disabled,
+}: {
+  readonly value: string;
+  readonly onValueChange: (value: string) => void;
+  readonly options: ReadonlyArray<{ readonly value: string; readonly label: string }>;
+  readonly ariaLabel: string;
+  readonly disabled?: boolean;
+}) {
+  return (
+    <Select
+      modal={false}
+      value={value}
+      items={options}
+      disabled={disabled}
+      onValueChange={(next) => next !== null && onValueChange(next)}
+    >
+      <SelectTrigger aria-label={ariaLabel}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectPopup>
+        <SelectGroup>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectPopup>
+    </Select>
   );
 }
 
