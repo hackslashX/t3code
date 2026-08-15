@@ -60,8 +60,7 @@ jobs:
           image="ghcr.io/$owner/${{ matrix.image }}"
           {
             echo 'tags<<EOF'
-            echo "$image:sha-$sha"
-            echo "$image:branch-$branch"
+            echo "$image:$branch-$sha"
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
