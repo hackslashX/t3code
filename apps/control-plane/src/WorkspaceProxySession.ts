@@ -15,7 +15,7 @@ const AAD = Buffer.from("t3-hosted-workspace-proxy-session-v1");
 
 const ProxySessionClaims = Schema.Struct({
   workspaceId: WorkspaceId,
-  accessToken: Schema.String,
+  credential: Schema.String,
   expiresAtEpochSeconds: Schema.Int,
 });
 export type ProxySessionClaims = typeof ProxySessionClaims.Type;

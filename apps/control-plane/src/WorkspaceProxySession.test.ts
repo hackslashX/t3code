@@ -12,17 +12,17 @@ import {
 const workspaceId = WorkspaceId.make("00000000-0000-4000-8000-000000000020");
 
 describe("WorkspaceProxySession", () => {
-  it("seals bearer credentials without exposing them", () => {
+  it("seals opaque workspace grant credentials", () => {
     const key = NodeCrypto.randomBytes(32);
     const sealed = sealWorkspaceProxySession(key, {
       workspaceId,
-      accessToken: "upstream-secret-token",
+      credential: "workspace-grant",
       expiresAtEpochSeconds: 200,
     });
-    assert.notInclude(sealed, "upstream-secret-token");
+    assert.notInclude(sealed, "workspace-grant");
     assert.deepEqual(openWorkspaceProxySession(key, sealed, 100), {
       workspaceId,
-      accessToken: "upstream-secret-token",
+      credential: "workspace-grant",
       expiresAtEpochSeconds: 200,
     });
   });
@@ -31,7 +31,7 @@ describe("WorkspaceProxySession", () => {
     const key = NodeCrypto.randomBytes(32);
     const sealed = sealWorkspaceProxySession(key, {
       workspaceId,
-      accessToken: "token",
+      credential: "token",
       expiresAtEpochSeconds: 200,
     });
     const expectReason = (reason: WorkspaceProxySessionError["reason"], run: () => unknown) => {

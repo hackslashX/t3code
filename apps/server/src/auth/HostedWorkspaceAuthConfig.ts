@@ -42,7 +42,7 @@ const envConfig = Config.all({
   workspaceId: Config.string("T3CODE_HOSTED_WORKSPACE_ID").pipe(Config.option),
   publicKeysDir: Config.string("T3CODE_HOSTED_WORKSPACE_PUBLIC_KEYS_DIR").pipe(Config.option),
   sessionLifetimeSeconds: Config.int("T3CODE_HOSTED_WORKSPACE_SESSION_LIFETIME_SECONDS").pipe(
-    Config.withDefault(43_200),
+    Config.withDefault(300),
   ),
 });
 

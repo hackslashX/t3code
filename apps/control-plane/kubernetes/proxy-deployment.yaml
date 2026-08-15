@@ -45,6 +45,8 @@ spec:
               value: workspaces.example.test
             - name: T3CODE_WORKSPACE_PROXY_SESSION_KEY_FILE
               value: /var/run/t3-workspace-proxy/session-key
+            - name: T3CODE_WORKSPACE_PROXY_CONTROL_PLANE_URL
+              value: http://t3-hosted-control-plane
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -134,6 +136,14 @@ spec:
         - port: 53
           protocol: UDP
         - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: t3-hosted-control-plane
+              app.kubernetes.io/component: control-plane
+      ports:
+        - port: 3000
           protocol: TCP
     - to:
         - podSelector:

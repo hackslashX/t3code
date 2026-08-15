@@ -2,6 +2,7 @@
 import * as NodeHttp from "node:http";
 import * as NodeNet from "node:net";
 import * as NodeFs from "node:fs";
+import * as NodeCrypto from "node:crypto";
 
 import {
   openWorkspaceProxySession,
@@ -18,11 +19,15 @@ const hostSuffix = process.env.T3CODE_WORKSPACE_PROXY_HOST_SUFFIX?.trim()
   .toLowerCase()
   .replace(/^\.+/, "");
 const keyFile = process.env.T3CODE_WORKSPACE_PROXY_SESSION_KEY_FILE;
+const controlPlaneUrl =
+  process.env.T3CODE_WORKSPACE_PROXY_CONTROL_PLANE_URL ??
+  (namespace === undefined ? undefined : `http://t3-hosted-control-plane.${namespace}.svc.cluster.local`);
 if (
   !namespace ||
   !upstreamHostSuffix ||
   !hostSuffix ||
   !keyFile ||
+  !controlPlaneUrl ||
   !Number.isInteger(port) ||
   port < 1 ||
   port > 65535
@@ -58,7 +63,36 @@ const cookieValue = (header: string | undefined, name: string) => {
   return undefined;
 };
 
-const targetFor = (request: NodeHttp.IncomingMessage) => {
+const leaseCache = new Map<string, { accessToken: string; expiresAt: number }>();
+const refreshLease = async (workspaceId: string, credential: string) => {
+  const cacheKey = `${workspaceId}:${credential}`;
+  const cached = leaseCache.get(cacheKey);
+  if (cached !== undefined && cached.expiresAt > Date.now()) return cached.accessToken;
+  const signature = NodeCrypto.createHmac("sha256", sessionKey)
+    .update(`${workspaceId}:${credential}`)
+    .digest("base64url");
+  const response = await fetch(`${controlPlaneUrl}/internal/workspace-proxy/lease`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-t3-workspace-proxy-signature": signature,
+    },
+    body: JSON.stringify({ workspaceId, credential }),
+  });
+  if (!response.ok) throw new Error(`workspace lease rejected (${response.status})`);
+  const lease = (await response.json()) as { accessToken: string; expiresInSeconds: number };
+  if (typeof lease.accessToken !== "string" || typeof lease.expiresInSeconds !== "number") {
+    throw new Error("workspace lease response invalid");
+  }
+  // Revalidate grants frequently, while still keeping one bearer session for a short burst.
+  leaseCache.set(cacheKey, {
+    accessToken: lease.accessToken,
+    expiresAt: Date.now() + Math.min(30_000, Math.max(1_000, (lease.expiresInSeconds - 5) * 1_000)),
+  });
+  return lease.accessToken;
+};
+
+const targetFor = async (request: NodeHttp.IncomingMessage) => {
   const host = request.headers.host?.split(":", 1)[0]?.toLowerCase();
   const match = host === undefined ? null : hostPattern.exec(host);
   if (match === null) return undefined;
@@ -81,7 +115,8 @@ const targetFor = (request: NodeHttp.IncomingMessage) => {
   return {
     service,
     workspaceId,
-    accessToken: claims.accessToken,
+    credential: claims.credential,
+    accessToken: await refreshLease(workspaceId, claims.credential),
     host: `ws-${workspaceId}.${upstreamHostSuffix}`,
     port: service === "t3" ? 3000 : 3001,
     externalHost: host,
@@ -90,7 +125,7 @@ const targetFor = (request: NodeHttp.IncomingMessage) => {
 
 const upstreamHeaders = (
   request: NodeHttp.IncomingMessage,
-  target: NonNullable<ReturnType<typeof targetFor>>,
+  target: NonNullable<Awaited<ReturnType<typeof targetFor>>>,
 ) => {
   const headers: NodeHttp.OutgoingHttpHeaders = {};
   for (const [name, value] of Object.entries(request.headers)) {
@@ -136,14 +171,15 @@ const server = NodeHttp.createServer((request, response) => {
     response.end('{"status":"ok"}');
     return;
   }
-  let target: ReturnType<typeof targetFor>;
-  try {
-    target = targetFor(request);
-  } catch {
-    return sendError(response, 401);
-  }
-  if (target === undefined) return sendError(response, 401);
-  const upstream = NodeHttp.request(
+  void (async () => {
+    let target: Awaited<ReturnType<typeof targetFor>>;
+    try {
+      target = await targetFor(request);
+    } catch {
+      return sendError(response, 401);
+    }
+    if (target === undefined) return sendError(response, 401);
+    const upstream = NodeHttp.request(
     {
       host: target.host,
       port: target.port,
@@ -166,25 +202,27 @@ const server = NodeHttp.createServer((request, response) => {
       upstreamResponse.pipe(response);
     },
   );
-  upstream.setTimeout(30_000, () => upstream.destroy(new Error("upstream timeout")));
-  upstream.on("error", () => sendError(response, 502));
-  request.on("aborted", () => upstream.destroy());
-  request.pipe(upstream);
+    upstream.setTimeout(30_000, () => upstream.destroy(new Error("upstream timeout")));
+    upstream.on("error", () => sendError(response, 502));
+    request.on("aborted", () => upstream.destroy());
+    request.pipe(upstream);
+  })();
 });
 
 server.on("upgrade", (request, socket, head) => {
-  let target: ReturnType<typeof targetFor>;
-  try {
-    target = targetFor(request);
-  } catch {
-    socket.destroy();
-    return;
-  }
-  if (target === undefined) {
-    process.stderr.write("workspace proxy rejected WebSocket upgrade\n");
-    return socket.destroy();
-  }
-  const headers = upstreamHeaders(request, target);
+  void (async () => {
+    let target: Awaited<ReturnType<typeof targetFor>>;
+    try {
+      target = await targetFor(request);
+    } catch {
+      socket.destroy();
+      return;
+    }
+    if (target === undefined) {
+      process.stderr.write("workspace proxy rejected WebSocket upgrade\n");
+      return socket.destroy();
+    }
+    const headers = upstreamHeaders(request, target);
   headers.connection = "Upgrade";
   headers.upgrade = "websocket";
   const upstream = NodeHttp.request({
@@ -224,7 +262,17 @@ server.on("upgrade", (request, socket, head) => {
     socket.destroy();
   });
   socket.on("error", () => upstream.destroy());
+  // WebSockets otherwise bypass HTTP authorization after the upgrade. Recheck the
+  // parent browser session/grant and tear down both ends as soon as it is revoked.
+  const authorizationCheck = setInterval(() => {
+    void refreshLease(target.workspaceId, target.credential).catch(() => {
+      socket.destroy();
+      upstream.destroy();
+    });
+  }, 30_000);
+  socket.once("close", () => clearInterval(authorizationCheck));
   upstream.end();
+  })();
 });
 
 const sockets = new Set<NodeNet.Socket>();
