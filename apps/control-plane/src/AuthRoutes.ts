@@ -17,6 +17,7 @@ import {
   OidcLoginTransactionError,
 } from "./OidcLogin.ts";
 import * as OidcProvider from "./OidcProvider.ts";
+import * as WorkspaceProxyGrantStore from "./WorkspaceProxyGrantStore.ts";
 
 const noStoreHeaders = {
   "cache-control": "no-store",
@@ -80,6 +81,7 @@ const callbackRoute = HttpRouter.add(
     const provider = yield* OidcProvider.OidcProvider;
     const identities = yield* IdentityRepository.IdentityRepository;
     const sessions = yield* BrowserSessionStore.BrowserSessionStore;
+    const grants = yield* WorkspaceProxyGrantStore.WorkspaceProxyGrantStore;
     const requestUrl = new URL(request.originalUrl, config.publicBaseUrl);
     const code = requestUrl.searchParams.get("code");
     const state = requestUrl.searchParams.get("state");
@@ -185,7 +187,10 @@ const logoutRoute = HttpRouter.add(
       return safeError("origin_forbidden", 403);
     }
     const token = request.cookies[BROWSER_SESSION_COOKIE];
-    if (token !== undefined) yield* sessions.revoke(token);
+    if (token !== undefined) {
+      yield* sessions.revoke(token);
+      yield* grants.revokeByBrowserSession(token);
+    }
     const cookies = yield* setCookie(BROWSER_SESSION_COOKIE, "", {
       ...cookieOptions(config.publicBaseUrl.protocol === "https:"),
       maxAge: 0,

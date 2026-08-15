@@ -1615,7 +1615,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           issuer: "https://control.example.test",
           workspaceId: "workspace-1",
           publicKeys: new Map([["key-1", keyPair.publicKey]]),
-          sessionLifetimeSeconds: 43_200,
+          sessionLifetimeSeconds: 300,
         },
       });
       const assertion = issueHostedWorkspaceAssertion({
@@ -1640,8 +1640,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       }>(response);
       assert.equal(response.status, 200);
       assert.equal(body.token_type, "Bearer");
-      assert.isAtLeast(body.expires_in, 43_199);
-      assert.isAtMost(body.expires_in, 43_200);
+      assert.isAtLeast(body.expires_in, 299);
+      assert.isAtMost(body.expires_in, 300);
       assert.equal(body.scope, "orchestration:read terminal:operate");
 
       const sessionUrl = yield* getHttpServerUrl("/api/auth/session");
@@ -1694,7 +1694,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           issuer: "https://control.example.test",
           workspaceId: "workspace-1",
           publicKeys: new Map([["key-1", keyPair.publicKey]]),
-          sessionLifetimeSeconds: 43_200,
+          sessionLifetimeSeconds: 300,
         },
       });
       const tokenUrl = yield* getHttpServerUrl("/api/auth/hosted-workspace-token");

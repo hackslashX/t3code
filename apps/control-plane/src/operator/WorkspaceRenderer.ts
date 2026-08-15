@@ -139,6 +139,7 @@ export function renderWorkspaceResources(
                     name: "T3CODE_HOSTED_WORKSPACE_PUBLIC_KEYS_DIR",
                     value: "/var/run/t3-hosted-auth/keys",
                   },
+                  { name: "T3CODE_HOSTED_WORKSPACE_SESSION_LIFETIME_SECONDS", value: "300" },
                   { name: "T3CODE_HOME", value: "/home/workspace/.t3" },
                 ],
                 ports: [

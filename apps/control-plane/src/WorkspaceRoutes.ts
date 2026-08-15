@@ -24,6 +24,7 @@ import {
 import { HostedWorkspaceAssertionIssuerError } from "./HostedWorkspaceAssertionIssuer.ts";
 import * as HostedWorkspaceAssertionIssuer from "./HostedWorkspaceAssertionIssuer.ts";
 import * as OidcConfig from "./OidcConfig.ts";
+import { BROWSER_SESSION_COOKIE } from "./AuthCookies.ts";
 import { OrganizationAuthorizationError } from "./OrganizationAuthorization.ts";
 import * as OrganizationAuthorization from "./OrganizationAuthorization.ts";
 import {
@@ -36,6 +37,8 @@ import * as WorkspaceAdmission from "./WorkspaceAdmission.ts";
 import { WorkspacePolicyRejectedError, validateWorkspaceCreate } from "./workspacePolicy.ts";
 import { WorkspaceProxySessionError } from "./WorkspaceProxySession.ts";
 import * as WorkspaceProxySession from "./WorkspaceProxySession.ts";
+import { WorkspaceProxyGrantError } from "./WorkspaceProxyGrantStore.ts";
+import * as WorkspaceProxyGrantStore from "./WorkspaceProxyGrantStore.ts";
 import { WorkspaceQueryError } from "./WorkspaceQuery.ts";
 import * as WorkspaceQuery from "./WorkspaceQuery.ts";
 import { WorkspaceRepositoryError } from "./WorkspaceRepository.ts";
@@ -60,6 +63,7 @@ type RouteError =
   | Schema.SchemaError
   | HostedWorkspaceAssertionIssuerError
   | WorkspaceProxySessionError
+  | WorkspaceProxyGrantError
   | Cookies.CookiesError
   | HttpServerError.HttpServerError;
 
@@ -95,6 +99,13 @@ const mapErrors = <R>(
         Schema.is(WorkspaceProxySessionError)(error)
       )
         return Effect.succeed(errorResponse("internal_error", 500));
+      if (Schema.is(WorkspaceProxyGrantError)(error))
+        return Effect.succeed(
+          errorResponse(
+            error.reason === "invalid_grant" ? "authentication_required" : "internal_error",
+            error.reason === "invalid_grant" ? 401 : 500,
+          ),
+        );
       if (Schema.is(WorkspaceQueryError)(error))
         return Effect.succeed(
           errorResponse(
@@ -343,7 +354,7 @@ const proxySessionRoute = HttpRouter.add(
         return errorResponse("workspace_not_found", 404);
       }
       const authenticated = yield* authenticateMutationRequest();
-      const role = yield* (yield* OrganizationAuthorization.OrganizationAuthorization).authorize(
+      yield* (yield* OrganizationAuthorization.OrganizationAuthorization).authorize(
         authenticated.principalId,
         organizationId,
         "workspace.read",
@@ -356,26 +367,22 @@ const proxySessionRoute = HttpRouter.add(
       if (workspace.phase !== "Ready" || workspace.environmentId === undefined) {
         return errorResponse("workspace_not_ready", 409);
       }
-      const assertion =
-        yield* (yield* HostedWorkspaceAssertionIssuer.HostedWorkspaceAssertionIssuer).issue({
-          principalId: authenticated.principalId,
-          organizationId,
-          organizationRole: role,
-          workspaceId,
-          environmentId: workspace.environmentId,
-        });
-      const exchanged = yield* (yield* WorkspaceProxySession.WorkspaceTokenExchange).exchange(
+      const browserSessionToken = request.cookies[BROWSER_SESSION_COOKIE];
+      if (browserSessionToken === undefined) return errorResponse("authentication_required", 401);
+      const grant = yield* (yield* WorkspaceProxyGrantStore.WorkspaceProxyGrantStore).issue({
+        browserSessionToken,
+        principalId: authenticated.principalId,
+        organizationId,
         workspaceId,
-        assertion.assertion,
-      );
+      });
       const now = Math.floor((yield* Clock.currentTimeMillis) / 1_000);
-      // The assertion is single-use and intentionally short-lived. The proxy session follows
-      // the independently issued T3 access-token lifetime.
-      const expiresAtEpochSeconds = now + Math.max(1, Math.floor(exchanged.expiresInSeconds));
+      // This cookie is only an opaque grant handle. The proxy fetches short-lived T3
+      // credentials itself, so no upstream bearer token survives browser logout.
+      const expiresAtEpochSeconds = now + 28_800;
       const proxySessions = yield* WorkspaceProxySession.WorkspaceProxySession;
       const sealed = proxySessions.seal({
         workspaceId,
-        accessToken: exchanged.accessToken,
+        credential: grant.credential,
         expiresAtEpochSeconds,
       });
       const publicConfig = yield* OidcConfig.OidcConfig;
@@ -397,6 +404,65 @@ const proxySessionRoute = HttpRouter.add(
           codeServerUrl: `https://code-${workspaceId}.${proxySessions.hostSuffix}/`,
         },
         { headers, cookies },
+      );
+    }),
+  ),
+);
+
+const ProxyLeaseRequest = Schema.Struct({
+  credential: Schema.String,
+  workspaceId: WorkspaceId,
+});
+
+const proxyLeaseRoute = HttpRouter.add(
+  "POST",
+  "/internal/workspace-proxy/lease",
+  mapErrors(
+    Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const input = yield* Schema.decodeUnknownEffect(ProxyLeaseRequest)(yield* request.json);
+      const signature = request.headers["x-t3-workspace-proxy-signature"];
+      const session = yield* WorkspaceProxySession.WorkspaceProxySession;
+      const expected = NodeCrypto.createHmac("sha256", session.key)
+        .update(`${input.workspaceId}:${input.credential}`)
+        .digest("base64url");
+      if (
+        signature === undefined ||
+        signature.length !== expected.length ||
+        !NodeCrypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+      ) {
+        return errorResponse("authentication_required", 401);
+      }
+      const grant = yield* (yield* WorkspaceProxyGrantStore.WorkspaceProxyGrantStore).verify(
+        input.credential,
+        input.workspaceId,
+      );
+      const role = yield* (yield* OrganizationAuthorization.OrganizationAuthorization).authorize(
+        grant.principalId,
+        grant.organizationId,
+        "workspace.read",
+      );
+      const workspace = yield* (yield* WorkspaceQuery.WorkspaceQuery).get(
+        grant.organizationId,
+        grant.workspaceId,
+      );
+      if (workspace.phase !== "Ready" || workspace.environmentId === undefined) {
+        return errorResponse("workspace_not_ready", 409);
+      }
+      const assertion = yield* (yield* HostedWorkspaceAssertionIssuer.HostedWorkspaceAssertionIssuer).issue({
+        principalId: grant.principalId,
+        organizationId: grant.organizationId,
+        organizationRole: role,
+        workspaceId: grant.workspaceId,
+        environmentId: workspace.environmentId,
+      });
+      const exchanged = yield* (yield* WorkspaceProxySession.WorkspaceTokenExchange).exchange(
+        grant.workspaceId,
+        assertion.assertion,
+      );
+      return HttpServerResponse.jsonUnsafe(
+        { accessToken: exchanged.accessToken, expiresInSeconds: exchanged.expiresInSeconds },
+        { headers },
       );
     }),
   ),
@@ -444,5 +510,6 @@ export const layer = Layer.mergeAll(
   desiredStateRoute,
   accessAssertionRoute,
   proxySessionRoute,
+  proxyLeaseRoute,
   deleteRoute,
 );

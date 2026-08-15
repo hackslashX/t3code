@@ -115,7 +115,7 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
           issuer: "https://control.example.test",
           workspaceId: "workspace-1",
           publicKeys: new Map(),
-          sessionLifetimeSeconds: 43_200,
+          sessionLifetimeSeconds: 300,
         }),
       ),
     ),

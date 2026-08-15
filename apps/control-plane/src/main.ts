@@ -27,6 +27,7 @@ import * as WorkspaceAdmission from "./WorkspaceAdmission.ts";
 import * as WorkspaceCatalog from "./WorkspaceCatalog.ts";
 import * as WorkspaceProjection from "./WorkspaceProjection.ts";
 import * as WorkspaceProxySession from "./WorkspaceProxySession.ts";
+import * as WorkspaceProxyGrantStore from "./WorkspaceProxyGrantStore.ts";
 import * as WorkspaceQuery from "./WorkspaceQuery.ts";
 import * as WorkspaceRepository from "./WorkspaceRepository.ts";
 import * as WorkspaceResourcePublisher from "./WorkspaceResourcePublisher.ts";
@@ -74,6 +75,7 @@ const ServicesLayer = Layer.mergeAll(
   WorkspaceProxySession.tokenExchangeLayer.pipe(
     Layer.provide(Layer.merge(ProjectionConfigLayer, FetchHttpClient.layer)),
   ),
+  WorkspaceProxyGrantStore.layer.pipe(Layer.provide(DatabaseLayer)),
   WorkspaceQuery.layer.pipe(Layer.provide(DatabaseLayer)),
   WorkspaceRepository.layer.pipe(Layer.provide(Layer.merge(DatabaseLayer, CatalogLayer))),
   WorkspaceResourcePublisher.layer.pipe(Layer.provide(KubernetesConfigLayer)),
