@@ -279,11 +279,12 @@ export function HostedDashboard() {
         onSectionChange={setSection}
         onLogout={() => void logout()}
       />
+      <HostedSidebarControl />
 
       <SidebarInset className="min-w-0 bg-background">
         <header
           className={cn(
-            "workspace-topbar sticky top-0 z-20 flex items-center gap-3 border-b bg-background/90 px-3 backdrop-blur transition-[padding-left] duration-200 ease-linear motion-reduce:transition-none sm:px-5",
+            "workspace-topbar sticky top-0 z-20 flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center gap-3 border-b bg-background/90 px-3 backdrop-blur transition-[padding-left] duration-200 ease-linear motion-reduce:transition-none sm:px-5",
             COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
           )}
         >
@@ -396,6 +397,14 @@ export function HostedDashboard() {
   );
 }
 
+function HostedSidebarControl() {
+  return (
+    <div className="pointer-events-none fixed left-[var(--workspace-controls-left)] top-[var(--workspace-controls-top)] z-50 ml-px hidden h-[var(--workspace-topbar-height)] items-center md:flex">
+      <SidebarTrigger className="pointer-events-auto" aria-label="Toggle hosted sidebar" />
+    </div>
+  );
+}
+
 function HostedSidebar({
   identity,
   organizationId,
@@ -420,16 +429,16 @@ function HostedSidebar({
   return (
     <Sidebar
       side="left"
-      collapsible="icon"
+      collapsible="offcanvas"
       data-app-sidebar=""
       className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
     >
-      <SidebarHeader className="h-[var(--workspace-topbar-height)] shrink-0 flex-row items-center px-3 py-0">
-        <SidebarTrigger className="shrink-0" />
+      <SidebarHeader className="h-[var(--workspace-topbar-height)] shrink-0 flex-row items-center px-3 py-0 md:px-0">
+        <SidebarTrigger className="shrink-0 md:hidden" />
         <a
           href="/"
           aria-label="T3 Code K8s dashboard"
-          className="sidebar-brand flex h-7 min-w-0 items-center gap-1 rounded-md outline-hidden ring-ring focus-visible:ring-2"
+          className="sidebar-brand flex h-7 min-w-0 items-center gap-1 rounded-md outline-hidden ring-ring focus-visible:ring-2 md:ml-[var(--workspace-titlebar-content-left)]"
         >
           <T3Wordmark />
           <span className="truncate text-sm font-medium tracking-tight text-muted-foreground">
