@@ -81,7 +81,6 @@ const callbackRoute = HttpRouter.add(
     const provider = yield* OidcProvider.OidcProvider;
     const identities = yield* IdentityRepository.IdentityRepository;
     const sessions = yield* BrowserSessionStore.BrowserSessionStore;
-    const grants = yield* WorkspaceProxyGrantStore.WorkspaceProxyGrantStore;
     const requestUrl = new URL(request.originalUrl, config.publicBaseUrl);
     const code = requestUrl.searchParams.get("code");
     const state = requestUrl.searchParams.get("state");
@@ -182,6 +181,7 @@ const logoutRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const config = yield* OidcConfig.OidcConfig;
     const sessions = yield* BrowserSessionStore.BrowserSessionStore;
+    const grants = yield* WorkspaceProxyGrantStore.WorkspaceProxyGrantStore;
     const origin = request.headers.origin;
     if (origin === undefined || origin !== config.publicBaseUrl.origin) {
       return safeError("origin_forbidden", 403);
