@@ -6,6 +6,7 @@ import * as NodeCrypto from "node:crypto";
 
 import {
   openWorkspaceProxySession,
+  WorkspaceProxySessionError,
   WORKSPACE_PROXY_SESSION_COOKIE,
 } from "./WorkspaceProxySession.ts";
 
@@ -63,6 +64,13 @@ const cookieValue = (header: string | undefined, name: string) => {
   return undefined;
 };
 
+class WorkspaceLeaseError extends Error {
+  constructor(readonly status: number) {
+    super(`workspace lease rejected (${status})`);
+    this.name = "WorkspaceLeaseError";
+  }
+}
+
 const leaseCache = new Map<string, { accessToken: string; expiresAt: number }>();
 const refreshLease = async (workspaceId: string, credential: string) => {
   const cacheKey = `${workspaceId}:${credential}`;
@@ -79,7 +87,7 @@ const refreshLease = async (workspaceId: string, credential: string) => {
     },
     body: JSON.stringify({ workspaceId, credential }),
   });
-  if (!response.ok) throw new Error(`workspace lease rejected (${response.status})`);
+  if (!response.ok) throw new WorkspaceLeaseError(response.status);
   const lease = (await response.json()) as { accessToken: string; expiresInSeconds: number };
   if (typeof lease.accessToken !== "string" || typeof lease.expiresInSeconds !== "number") {
     throw new Error("workspace lease response invalid");
@@ -153,6 +161,19 @@ const upstreamHeaders = (
   return headers;
 };
 
+const proxyErrorStatus = (error: unknown) =>
+  error instanceof WorkspaceProxySessionError ||
+  (error instanceof WorkspaceLeaseError && (error.status === 401 || error.status === 403))
+    ? 401
+    : 502;
+
+const logProxyError = (request: NodeHttp.IncomingMessage, error: unknown) => {
+  const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  process.stderr.write(
+    `workspace proxy request failed for ${request.headers.host ?? "unknown host"}: ${detail}\n`,
+  );
+};
+
 const sendError = (response: NodeHttp.ServerResponse, status: number) => {
   if (response.headersSent) return response.destroy();
   response.writeHead(status, {
@@ -175,8 +196,9 @@ const server = NodeHttp.createServer((request, response) => {
     let target: Awaited<ReturnType<typeof targetFor>>;
     try {
       target = await targetFor(request);
-    } catch {
-      return sendError(response, 401);
+    } catch (error) {
+      logProxyError(request, error);
+      return sendError(response, proxyErrorStatus(error));
     }
     if (target === undefined) return sendError(response, 401);
     const upstream = NodeHttp.request(
@@ -214,7 +236,8 @@ server.on("upgrade", (request, socket, head) => {
     let target: Awaited<ReturnType<typeof targetFor>>;
     try {
       target = await targetFor(request);
-    } catch {
+    } catch (error) {
+      logProxyError(request, error);
       socket.destroy();
       return;
     }
