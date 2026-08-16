@@ -1,0 +1,61 @@
+FROM node:24.13.1-bookworm-slim AS build
+
+ARG PNPM_VERSION=11.10.0
+# hadolint ignore=DL3008
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends build-essential ca-certificates git python3 \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable \
+  && corepack prepare pnpm@${PNPM_VERSION} --activate
+
+WORKDIR /repo
+COPY . .
+RUN pnpm --config.allow-unused-patches=true --filter t3... install --frozen-lockfile \
+  && pnpm --filter @t3tools/web build \
+  && pnpm --filter t3 build:bundle \
+  && rm -rf apps/server/dist/client \
+  && cp -R apps/web/dist apps/server/dist/client \
+  && pnpm --config.allow-unused-patches=true --filter t3 deploy --legacy --prod /out
+
+FROM ghcr.io/coder/code-server@sha256:3623e6362abdec6258472882b06fdeec9d6ce2ad3fda316b3c5d7ed092b89add AS code-server
+
+FROM ubuntu:24.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+ARG NODE_VERSION=24.13.1
+ARG TARGETARCH
+# Runtime packages and build tools are image-owned. User-level language environments,
+# editor extensions, package caches, and projects persist in /home/workspace.
+# hadolint ignore=DL3008
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    build-essential ca-certificates curl git openssh-client procps python3 python3-pip \
+    python3-venv ripgrep xz-utils \
+  && case "${TARGETARCH}" in amd64) node_arch=x64 ;; arm64) node_arch=arm64 ;; *) exit 1 ;; esac \
+  && curl -fsSLo /tmp/node.tar.xz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz" \
+  && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
+  && rm -f /tmp/node.tar.xz \
+  && rm -rf /var/lib/apt/lists/* \
+  && groupmod --new-name workspace ubuntu \
+  && usermod --login workspace --home /home/workspace --move-home --shell /bin/bash ubuntu
+
+COPY --from=code-server /usr/lib/code-server /usr/lib/code-server
+COPY --from=code-server /usr/bin/code-server /usr/bin/code-server
+WORKDIR /app
+COPY --from=build /out/ ./
+COPY apps/server/hosted-entrypoint.sh /usr/local/bin/hosted-entrypoint
+RUN chmod 0755 /usr/local/bin/hosted-entrypoint
+
+ENV HOME=/home/workspace \
+  NPM_CONFIG_PREFIX=/home/workspace/.local \
+  PATH=/home/workspace/.linuxbrew/bin:/home/workspace/.linuxbrew/sbin:/home/workspace/.local/bin:${PATH} \
+  T3CODE_MODE=web \
+  T3CODE_HOST=0.0.0.0 \
+  T3CODE_PORT=3000 \
+  T3CODE_HOME=/home/workspace/.t3 \
+  T3CODE_NO_BROWSER=true \
+  T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD=false
+
+USER 1000:1000
+EXPOSE 3000 3001
+ENTRYPOINT ["/usr/local/bin/hosted-entrypoint"]

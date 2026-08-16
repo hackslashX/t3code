@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: phase0-postgres
+  namespace: t3codes-testing
+  labels:
+    hosted.t3.codes/spike: phase-0
+stringData:
+  POSTGRES_PASSWORD: phase0-disposable-password
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: phase0-postgres
+  namespace: t3codes-testing
+  labels:
+    hosted.t3.codes/spike: phase-0
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn-ssd-orion
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: phase0-postgres
+  namespace: t3codes-testing
+  labels:
+    app.kubernetes.io/name: phase0-postgres
+    hosted.t3.codes/spike: phase-0
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    kubernetes.io/hostname: orion
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: postgres
+      image: postgres:17.6
+      ports:
+        - name: postgres
+          containerPort: 5432
+      env:
+        - name: POSTGRES_DB
+          value: t3_hosted_test
+        - name: POSTGRES_USER
+          value: t3_hosted_test
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: phase0-postgres
+              key: POSTGRES_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+      readinessProbe:
+        exec:
+          command: ["pg_isready", "-U", "t3_hosted_test", "-d", "t3_hosted_test"]
+        initialDelaySeconds: 2
+        periodSeconds: 2
+      resources:
+        requests:
+          cpu: 10m
+          memory: 128Mi
+          ephemeral-storage: 128Mi
+        limits:
+          cpu: "1"
+          memory: 512Mi
+          ephemeral-storage: 1Gi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+      volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: tmp
+          mountPath: /tmp
+        - name: run
+          mountPath: /var/run/postgresql
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: phase0-postgres
+    - name: tmp
+      emptyDir: {}
+    - name: run
+      emptyDir: {}

@@ -56,8 +56,13 @@ import {
   type KeybindingsUpdateToastController,
 } from "../components/KeybindingsUpdateToast.logic";
 
+const isHostedDashboardBuild = import.meta.env.VITE_T3_HOSTED_DASHBOARD === "true";
+
 export const Route = createRootRoute({
   beforeLoad: async ({ location }) => {
+    if (location.pathname === "/hosted" || (isHostedDashboardBuild && location.pathname === "/")) {
+      return { authGateState: { status: "hosted-static" } as const };
+    }
     if (location.pathname === "/pair" && hasHostedPairingRequest(new URL(window.location.href))) {
       return {
         authGateState: {
@@ -100,7 +105,13 @@ function RootRouteView() {
     };
   }, [pathname]);
 
-  if (pathname === "/pair" || pathname === "/connect" || pathname.startsWith("/connect/")) {
+  if (
+    pathname === "/pair" ||
+    pathname === "/hosted" ||
+    (isHostedDashboardBuild && pathname === "/") ||
+    pathname === "/connect" ||
+    pathname.startsWith("/connect/")
+  ) {
     return (
       <>
         <DocumentTitleSync />

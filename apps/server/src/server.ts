@@ -86,6 +86,7 @@ import * as RemoteOpenTargets from "./environment/RemoteOpenTargets.ts";
 import { authHttpApiLayer, environmentAuthenticatedAuthLayer } from "./auth/http.ts";
 import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
+import * as HostedWorkspaceAuthConfig from "./auth/HostedWorkspaceAuthConfig.ts";
 import {
   connectHttpApiLayer,
   pendingServiceUpdateExists,
@@ -352,6 +353,7 @@ const ProjectFaviconResolverLayerLive = ProjectFaviconResolver.layer.pipe(
 const AuthLayerLive = EnvironmentAuth.layer.pipe(
   Layer.provideMerge(PersistenceLayerLive),
   Layer.provide(ServerSecretStore.layer),
+  Layer.provideMerge(HostedWorkspaceAuthConfig.layer),
 );
 
 const CloudManagedEndpointRuntimeLive = Layer.mergeAll(
