@@ -6,6 +6,7 @@ import {
   CreateOrganizationInvitationRequest,
   CreateWorkspaceRequest,
   UpdateWorkspaceDesiredStateRequest,
+  WorkspaceSummary,
 } from "./index.ts";
 
 const decodeCreate = Schema.decodeUnknownOption(CreateWorkspaceRequest);
@@ -71,6 +72,42 @@ it("decodes existing storage only through a platform volume ID", () => {
 
   assert(Option.isSome(decoded));
   assert.equal(decoded.value.storage.kind, "existing");
+});
+
+it("decodes workspace summaries with their provisioned resources and disk", () => {
+  const decoded = Schema.decodeUnknownOption(WorkspaceSummary)({
+    id: "00000000-0000-4000-8000-000000000001",
+    name: "development",
+    slug: "development",
+    desiredState: "Running",
+    phase: "Ready",
+    generation: 2,
+    observedGeneration: 2,
+    nodeName: "orion",
+    imageProfile: "stable",
+    imageRevision: "2026.08.16",
+    resources: {
+      cpuRequestMillis: 500,
+      cpuLimitMillis: 2000,
+      memoryRequestBytes: 1_073_741_824,
+      memoryLimitBytes: 4_294_967_296,
+      ephemeralStorageBytes: 2_147_483_648,
+    },
+    storage: {
+      capacityBytes: 21_474_836_480,
+      storageClass: "longhorn-ssd-orion",
+      accessMode: "ReadWriteOnce",
+      source: "created",
+      retentionPolicy: "retain",
+    },
+    egressProfile: "internet",
+    createdAt: "2026-08-16T00:00:00.000Z",
+    updatedAt: "2026-08-16T00:00:00.000Z",
+  });
+
+  assert(Option.isSome(decoded));
+  assert.equal(decoded.value.resources.cpuLimitMillis, 2000);
+  assert.equal(decoded.value.storage.capacityBytes, 21_474_836_480);
 });
 
 it("rejects invalid resource and storage values", () => {

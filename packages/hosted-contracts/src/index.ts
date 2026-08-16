@@ -203,6 +203,15 @@ export const Workspace = Schema.Struct({
 });
 export type Workspace = typeof Workspace.Type;
 
+export const WorkspaceStorageSummary = Schema.Struct({
+  capacityBytes: PositiveInt,
+  storageClass: TrimmedNonEmptyString,
+  accessMode: Schema.Literals(["ReadWriteOnce", "ReadWriteMany"]),
+  source: Schema.Literals(["created", "imported"]),
+  retentionPolicy: Schema.Literals(["retain", "delete"]),
+});
+export type WorkspaceStorageSummary = typeof WorkspaceStorageSummary.Type;
+
 export const WorkspaceSummary = Schema.Struct({
   id: WorkspaceId,
   name: TrimmedNonEmptyString,
@@ -214,6 +223,9 @@ export const WorkspaceSummary = Schema.Struct({
   nodeName: TrimmedNonEmptyString,
   imageProfile: TrimmedNonEmptyString,
   imageRevision: TrimmedNonEmptyString,
+  resources: WorkspaceResources,
+  storage: WorkspaceStorageSummary,
+  egressProfile: TrimmedNonEmptyString,
   routeHost: Schema.optionalKey(TrimmedNonEmptyString),
   environmentId: Schema.optionalKey(TrimmedNonEmptyString),
   failureReason: Schema.optionalKey(TrimmedNonEmptyString),

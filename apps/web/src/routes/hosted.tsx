@@ -399,7 +399,7 @@ export function HostedDashboard() {
 
 function HostedSidebarControl() {
   return (
-    <div className="pointer-events-none fixed left-[var(--workspace-controls-left)] top-[var(--workspace-controls-top)] z-50 ml-px hidden h-[var(--workspace-topbar-height)] items-center md:flex">
+    <div className="pointer-events-none fixed left-[var(--workspace-controls-left)] top-[var(--workspace-controls-top)] z-50 ml-px flex h-[var(--workspace-topbar-height)] items-center">
       <SidebarTrigger className="pointer-events-auto" aria-label="Toggle hosted sidebar" />
     </div>
   );
@@ -786,7 +786,22 @@ function WorkspaceDetails({ workspace }: { readonly workspace: WorkspaceSummary 
   const rows = [
     ["Workspace ID", workspace.id],
     ["Desired state", workspace.desiredState],
-    ["Target node", workspace.nodeName],
+    ["Assigned node", workspace.nodeName],
+    ["CPU request / limit", `${workspace.resources.cpuRequestMillis}m / ${workspace.resources.cpuLimitMillis}m`],
+    [
+      "Memory request / limit",
+      `${formatBytes(workspace.resources.memoryRequestBytes)} / ${formatBytes(workspace.resources.memoryLimitBytes)}`,
+    ],
+    ["Persistent disk", formatBytes(workspace.storage.capacityBytes)],
+    ["Ephemeral disk", formatBytes(workspace.resources.ephemeralStorageBytes)],
+    ["Storage class", workspace.storage.storageClass],
+    ["Storage access", workspace.storage.accessMode],
+    ["Storage source", workspace.storage.source],
+    ["On deletion", workspace.storage.retentionPolicy],
+    ["Egress profile", workspace.egressProfile],
+    ...(workspace.resources.gpu
+      ? [["GPU", `${workspace.resources.gpu.count} × ${workspace.resources.gpu.className}`] as const]
+      : []),
     ["Environment ID", workspace.environmentId ?? "Not assigned"],
     ["Route host", workspace.routeHost ?? "Not assigned"],
     ["Image profile", `${workspace.imageProfile} · ${workspace.imageRevision}`],
@@ -804,6 +819,11 @@ function WorkspaceDetails({ workspace }: { readonly workspace: WorkspaceSummary 
       ))}
     </dl>
   );
+}
+
+function formatBytes(bytes: number): string {
+  const gibibytes = bytes / gibibyte;
+  return Number.isInteger(gibibytes) ? `${gibibytes} GiB` : `${gibibytes.toFixed(1)} GiB`;
 }
 
 function StorageSection({ storage }: { readonly storage: StorageOptions | undefined }) {
