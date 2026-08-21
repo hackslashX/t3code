@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./control-plane": {
+      "types": "./src/control-plane/index.ts",
+      "default": "./src/control-plane/index.ts"
+    },
     "./connection": {
       "types": "./src/connection/index.ts",
       "default": "./src/connection/index.ts"
@@ -158,6 +162,7 @@
   },
   "dependencies": {
     "@t3tools/contracts": "workspace:*",
+    "@t3tools/hosted-contracts": "workspace:*",
     "@t3tools/shared": "workspace:*",
     "effect": "catalog:"
   },

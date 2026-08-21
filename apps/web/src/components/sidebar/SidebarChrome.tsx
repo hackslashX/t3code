@@ -102,7 +102,7 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
   );
 }
 
-function T3Wordmark() {
+export function T3Wordmark() {
   return (
     <svg
       aria-label="T3"

@@ -18,8 +18,14 @@ import {
 import { useEnvironments } from "../state/environments";
 import { APP_DISPLAY_NAME } from "~/branding";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
+import { cn } from "~/lib/utils";
+import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
+import { HostedDashboard } from "./hosted";
+
+const isHostedDashboardBuild = import.meta.env.VITE_T3_HOSTED_DASHBOARD === "true";
 
 function ChatIndexRouteView() {
+  if (isHostedDashboardBuild) return <HostedDashboard />;
   const { authGateState } = Route.useRouteContext();
   const { environments } = useEnvironments();
 
