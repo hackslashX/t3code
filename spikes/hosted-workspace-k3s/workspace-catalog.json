@@ -1,0 +1,16 @@
+{
+  "imageProfiles": ["stable"],
+  "egressProfiles": ["restricted"],
+  "storageClasses": [
+    {
+      "name": "longhorn-ssd-orion",
+      "isDefault": true,
+      "allowExpansion": true,
+      "bindingMode": "Immediate",
+      "allowedAccessModes": ["ReadWriteOnce"],
+      "minimumBytes": 1073741824,
+      "maximumBytes": 1099511627776
+    }
+  ],
+  "gpuClasses": []
+}

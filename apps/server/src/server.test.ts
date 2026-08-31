@@ -8,6 +8,9 @@ import {
   AuthAccessTokenType,
   AuthEnvironmentBootstrapTokenType,
   AuthTokenExchangeGrantType,
+  AuthOrchestrationReadScope,
+  AuthTerminalOperateScope,
+  HostedWorkspaceAssertionType,
   CommandId,
   DEFAULT_SERVER_SETTINGS,
   type DpopFailureReason,
@@ -151,6 +154,7 @@ import * as ReviewService from "./review/ReviewService.ts";
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
 import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
+import * as HostedWorkspaceAuthConfig from "./auth/HostedWorkspaceAuthConfig.ts";
 import * as CloudManagedEndpointRuntime from "./cloud/ManagedEndpointRuntime.ts";
 import * as CloudCliTokenManager from "./cloud/CliTokenManager.ts";
 import * as ProcessDiagnostics from "./diagnostics/ProcessDiagnostics.ts";
@@ -394,6 +398,7 @@ const makeBrowserOtlpPayload = (spanName: string) =>
 
 const buildAppUnderTest = (options?: {
   config?: Partial<ServerConfig.ServerConfig["Service"]>;
+  hostedWorkspaceAuth?: HostedWorkspaceAuthConfig.HostedWorkspaceAuthConfigValue;
   layers?: {
     keybindings?: Partial<Keybindings.Keybindings["Service"]>;
     environmentTheme?: Partial<EnvironmentTheme.EnvironmentThemeService["Service"]>;
@@ -996,6 +1001,12 @@ const buildAppUnderTest = (options?: {
         }),
       ),
       Layer.provideMerge(makeAuthTestLayer()),
+      Layer.provide(
+        Layer.succeed(
+          HostedWorkspaceAuthConfig.HostedWorkspaceAuthConfig,
+          options?.hostedWorkspaceAuth ?? { enabled: false },
+        ),
+      ),
       Layer.provideMerge(ServerSecretStore.layer),
       Layer.provide(workspaceAndProjectServicesLayer),
       Layer.provideMerge(FetchHttpClient.layer),
@@ -1090,6 +1101,40 @@ const bootstrapBrowserSession = (
       cookie: response.headers["set-cookie"],
     };
   });
+
+const issueHostedWorkspaceAssertion = (input: {
+  readonly privateKey: NodeCrypto.KeyObject;
+  readonly keyId: string;
+  readonly assertionId: string;
+  readonly workspaceId?: string;
+  readonly environmentId?: string;
+  readonly issuer?: string;
+  readonly audience?: string;
+  readonly scopes?: ReadonlyArray<string>;
+  readonly expiresAt?: number;
+}) => {
+  const environmentId = input.environmentId ?? testEnvironmentDescriptor.environmentId;
+  const header = { alg: "ES256", kid: input.keyId, typ: HostedWorkspaceAssertionType };
+  const claims = {
+    iss: input.issuer ?? "https://control.example.test",
+    aud: input.audience ?? `urn:t3:environment:${environmentId}`,
+    sub: "principal-1",
+    org: "organization-1",
+    workspace: input.workspaceId ?? "workspace-1",
+    environment: environmentId,
+    scope: input.scopes ?? [AuthOrchestrationReadScope, AuthTerminalOperateScope],
+    iat: 0,
+    nbf: 0,
+    exp: input.expiresAt ?? 60,
+    jti: input.assertionId,
+  };
+  const signingInput = `${Buffer.from(JSON.stringify(header)).toString("base64url")}.${Buffer.from(JSON.stringify(claims)).toString("base64url")}`;
+  const signature = NodeCrypto.sign("sha256", Buffer.from(signingInput), {
+    key: input.privateKey,
+    dsaEncoding: "ieee-p1363",
+  });
+  return `${signingInput}.${signature.toString("base64url")}`;
+};
 
 const exchangeAccessToken = (
   credential = defaultDesktopBootstrapToken,
@@ -1602,6 +1647,151 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       // Desktop, so port-scoped: instances scan for a free port and share
       // 127.0.0.1, and cookies are not scoped by port.
       assert.isTrue(body.auth.sessionCookieName.startsWith("t3_session_"));
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect("exchanges a hosted workspace assertion once for a scoped bearer session", () =>
+    Effect.gen(function* () {
+      const keyPair = NodeCrypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
+      yield* buildAppUnderTest({
+        hostedWorkspaceAuth: {
+          enabled: true,
+          issuer: "https://control.example.test",
+          workspaceId: "workspace-1",
+          publicKeys: new Map([["key-1", keyPair.publicKey]]),
+          sessionLifetimeSeconds: 300,
+        },
+      });
+      const assertion = issueHostedWorkspaceAssertion({
+        privateKey: keyPair.privateKey,
+        keyId: "key-1",
+        assertionId: "assertion-1",
+      });
+      const tokenUrl = yield* getHttpServerUrl("/api/auth/hosted-workspace-token");
+      const exchange = () =>
+        fetchEffect(tokenUrl, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: jsonRequestBody({ assertion, client_label: "Hosted web" }),
+        });
+
+      const response = yield* exchange();
+      const body = yield* responseJsonEffect<{
+        readonly access_token: string;
+        readonly token_type: string;
+        readonly expires_in: number;
+        readonly scope: string;
+      }>(response);
+      assert.equal(response.status, 200);
+      assert.equal(body.token_type, "Bearer");
+      assert.isAtLeast(body.expires_in, 299);
+      assert.isAtMost(body.expires_in, 300);
+      assert.equal(body.scope, "orchestration:read terminal:operate");
+
+      const sessionUrl = yield* getHttpServerUrl("/api/auth/session");
+      const sessionResponse = yield* fetchEffect(sessionUrl, {
+        headers: { authorization: `Bearer ${body.access_token}` },
+      });
+      const sessionBody = yield* responseJsonEffect<{
+        readonly authenticated: boolean;
+        readonly scopes: ReadonlyArray<string>;
+      }>(sessionResponse);
+      assert.equal(sessionResponse.status, 200);
+      assert.equal(sessionBody.authenticated, true);
+      assert.deepEqual(sessionBody.scopes, ["orchestration:read", "terminal:operate"]);
+
+      const replayResponse = yield* exchange();
+      const replayBody = yield* responseJsonEffect<{ readonly reason: string }>(replayResponse);
+      assert.equal(replayResponse.status, 401);
+      assert.equal(replayBody.reason, "invalid_credential");
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect("rejects hosted assertions when hosted authentication is disabled", () =>
+    Effect.gen(function* () {
+      const keyPair = NodeCrypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
+      yield* buildAppUnderTest();
+      const tokenUrl = yield* getHttpServerUrl("/api/auth/hosted-workspace-token");
+      const response = yield* fetchEffect(tokenUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: jsonRequestBody({
+          assertion: issueHostedWorkspaceAssertion({
+            privateKey: keyPair.privateKey,
+            keyId: "key-1",
+            assertionId: "disabled-assertion",
+          }),
+        }),
+      });
+      const body = yield* responseJsonEffect<{ readonly reason: string }>(response);
+      assert.equal(response.status, 401);
+      assert.equal(body.reason, "invalid_credential");
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect("rejects hosted assertion trust-boundary and scope violations", () =>
+    Effect.gen(function* () {
+      const keyPair = NodeCrypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
+      yield* buildAppUnderTest({
+        hostedWorkspaceAuth: {
+          enabled: true,
+          issuer: "https://control.example.test",
+          workspaceId: "workspace-1",
+          publicKeys: new Map([["key-1", keyPair.publicKey]]),
+          sessionLifetimeSeconds: 300,
+        },
+      });
+      const tokenUrl = yield* getHttpServerUrl("/api/auth/hosted-workspace-token");
+      const invalidAssertions = [
+        issueHostedWorkspaceAssertion({
+          privateKey: keyPair.privateKey,
+          keyId: "key-1",
+          assertionId: "wrong-issuer",
+          issuer: "https://other.example.test",
+        }),
+        issueHostedWorkspaceAssertion({
+          privateKey: keyPair.privateKey,
+          keyId: "key-1",
+          assertionId: "wrong-audience",
+          audience: "urn:t3:environment:other",
+        }),
+        issueHostedWorkspaceAssertion({
+          privateKey: keyPair.privateKey,
+          keyId: "key-1",
+          assertionId: "wrong-workspace",
+          workspaceId: "workspace-2",
+        }),
+        issueHostedWorkspaceAssertion({
+          privateKey: keyPair.privateKey,
+          keyId: "key-1",
+          assertionId: "wrong-environment",
+          environmentId: "environment-other",
+          audience: `urn:t3:environment:${testEnvironmentDescriptor.environmentId}`,
+        }),
+        issueHostedWorkspaceAssertion({
+          privateKey: keyPair.privateKey,
+          keyId: "key-1",
+          assertionId: "expired",
+          expiresAt: -1,
+        }),
+        issueHostedWorkspaceAssertion({
+          privateKey: keyPair.privateKey,
+          keyId: "key-1",
+          assertionId: "overbroad-scope",
+          scopes: ["access:write"],
+        }),
+      ];
+
+      for (const assertion of invalidAssertions) {
+        const response = yield* fetchEffect(tokenUrl, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: jsonRequestBody({ assertion }),
+        });
+        const body = yield* responseJsonEffect<{ readonly reason: string }>(response);
+        assert.equal(response.status, 401);
+        assert.equal(body.reason, "invalid_credential");
+      }
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 

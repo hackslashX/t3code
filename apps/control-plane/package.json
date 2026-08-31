@@ -1,0 +1,31 @@
+{
+  "name": "@t3tools/control-plane",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/main.ts src/operator-main.ts src/proxy-main.ts src/migrate.ts --bundle --platform=node --format=esm --packages=external --alias:@t3tools/hosted-contracts=../../packages/hosted-contracts/src/index.ts --alias:@t3tools/contracts/auth=../../packages/contracts/src/auth.ts --outdir=dist --out-extension:.js=.mjs",
+    "migrate": "node dist/migrate.mjs",
+    "operator": "node dist/operator-main.mjs",
+    "proxy": "node dist/proxy-main.mjs",
+    "start": "node dist/main.mjs",
+    "test:repository": "node src/repository-smoke.ts",
+    "typecheck": "tsgo --noEmit",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "@effect/sql-pg": "catalog:",
+    "@kubernetes/client-node": "1.4.0",
+    "@t3tools/contracts": "workspace:*",
+    "@t3tools/hosted-contracts": "workspace:*",
+    "effect": "catalog:",
+    "jose": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "esbuild": "0.28.2",
+    "vite-plus": "catalog:"
+  }
+}
