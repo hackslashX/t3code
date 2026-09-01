@@ -9,6 +9,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import type { Thread, ThreadShell } from "../types";
+import type { CodexArtifactTemplate } from "@t3tools/client-runtime/codex-artifact-templates";
 import {
   MAX_HIDDEN_MOUNTED_PREVIEW_THREADS,
   MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
@@ -21,6 +22,8 @@ import {
   dismissBranchMismatchForSession,
   ENVIRONMENT_RECONNECT_WARNING_GRACE_MS,
   getStartedThreadModelChangeBlockReason,
+  loadVideoPreviewUrl,
+  isVideoPreviewRequestCurrent,
   hasEnvironmentReconnectWarningGraceElapsed,
   hasServerAcknowledgedLocalDispatch,
   isBranchMismatchDismissedForSession,
@@ -32,8 +35,8 @@ import {
   resolveSendEnvMode,
   resolveDraftHeroState,
   scheduleEnvironmentReconnectWarning,
-  shoulderTabReserve,
   startNewThreadForProject,
+  codexArtifactTemplatePromptToAppend,
   shouldDockDraftHeroForSubmission,
   shouldReleaseTimelineAnchorForToolActivity,
   shouldShowBranchMismatchBanner,
@@ -41,26 +44,47 @@ import {
   shouldWriteThreadErrorToCurrentServerThread,
 } from "./ChatView.logic";
 
+describe("loadVideoPreviewUrl", () => {
+  it("loads video bytes into an object URL", async () => {
+    const objectUrl = await loadVideoPreviewUrl("data:video/mp4;base64,AA==");
+    expect(objectUrl).toMatch(/^blob:/);
+    URL.revokeObjectURL(objectUrl);
+  });
+
+  it("stops loading when the preview request is cancelled", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      loadVideoPreviewUrl("data:video/mp4;base64,AA==", controller.signal),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+});
+
+describe("isVideoPreviewRequestCurrent", () => {
+  it("rejects changed threads and replaced previews", () => {
+    expect(isVideoPreviewRequestCurrent("thread-1", "thread-2", 1, 1)).toBe(false);
+    expect(isVideoPreviewRequestCurrent("thread-1", "thread-1", 1, 2)).toBe(false);
+    expect(isVideoPreviewRequestCurrent("thread-1", "thread-1", 2, 2)).toBe(true);
+  });
+});
+
 const environmentId = EnvironmentId.make("environment-local");
 const projectId = ProjectId.make("project-1");
 const threadId = ThreadId.make("thread-1");
 const now = "2026-03-29T00:00:00.000Z";
+const helloWorldTemplate: CodexArtifactTemplate = {
+  artifactKind: "document",
+  displayName: "Hello World",
+  skillDirectory: "/Users/test/.codex/skills/artifact-template-hello-world",
+  skillName: "artifact-template-hello-world",
+};
 
-describe("shoulderTabReserve", () => {
-  it("ignores the top drawer when measuring the shoulder tab band", () => {
-    const elementAt = (top: number) => ({ getBoundingClientRect: () => ({ top }) }) as HTMLElement;
-    const elements = new Map<string, HTMLElement>([
-      ['[data-chat-composer-form="true"]', elementAt(20)],
-      [".chat-composer-shoulder-tab", elementAt(100)],
-      ['[data-chat-composer-main-surface="true"]', elementAt(128)],
-    ]);
-    const overlay = {
-      querySelector: (selector: string) => elements.get(selector) ?? null,
-    } as HTMLElement;
+describe("artifact template composer insertion", () => {
+  it("does not insert an already-present prompt", () => {
+    const prompt = "Create a document using this $artifact-template-hello-world about…";
 
-    expect(shoulderTabReserve(overlay)).toBe(28);
-    elements.set(".chat-composer-tasks-tab", elementAt(100));
-    expect(shoulderTabReserve(overlay)).toBe(0);
+    expect(codexArtifactTemplatePromptToAppend(prompt, helloWorldTemplate)).toBeNull();
   });
 });
 
@@ -91,7 +115,7 @@ describe("draft hero submission transition", () => {
     expect(
       resolveDraftPromotionNavigationTarget({
         serverThreadRef: { environmentId, threadId },
-        serverThreadStarted: true,
+        serverThread: makeThread({ latestTurn: completedTurn }),
         backgroundSubmissionPending: true,
       }),
     ).toBeNull();
@@ -291,6 +315,66 @@ const readySession = {
   lastError: null,
   updatedAt: "2026-03-29T00:00:10.000Z",
 };
+
+describe("draft promotion during worktree setup", () => {
+  const serverThreadRef = { environmentId, threadId };
+
+  it.each([null, "idle", "starting", "ready"] as const)(
+    "keeps the draft mounted while the first turn waits with session %s",
+    (status) => {
+      const serverThread = makeThread({
+        messages: [
+          {
+            id: MessageId.make("submitted-message"),
+            role: "user",
+            text: "Start in a new worktree",
+            turnId: null,
+            createdAt: now,
+            updatedAt: now,
+            streaming: false,
+          },
+        ],
+        session: status ? { ...readySession, status } : null,
+      });
+
+      expect(
+        resolveDraftPromotionNavigationTarget({
+          serverThreadRef,
+          serverThread,
+          backgroundSubmissionPending: false,
+        }),
+      ).toBeNull();
+    },
+  );
+
+  it("promotes when the provider starts the first turn", () => {
+    const latestTurn = { ...completedTurn, state: "running" as const, completedAt: null };
+
+    expect(
+      resolveDraftPromotionNavigationTarget({
+        serverThreadRef,
+        serverThread: makeThread({
+          latestTurn,
+          session: { ...readySession, status: "running", activeTurnId: latestTurn.turnId },
+        }),
+        backgroundSubmissionPending: false,
+      }),
+    ).toEqual(serverThreadRef);
+  });
+
+  it.each(["error", "stopped", "interrupted"] as const)(
+    "promotes a startup that ends as %s before a turn starts",
+    (status) => {
+      expect(
+        resolveDraftPromotionNavigationTarget({
+          serverThreadRef,
+          serverThread: makeThread({ session: { ...readySession, status } }),
+          backgroundSubmissionPending: false,
+        }),
+      ).toEqual(serverThreadRef);
+    },
+  );
+});
 
 describe("buildLoadingThreadFromShell", () => {
   it("preserves shell metadata and supplies empty detail collections", () => {
