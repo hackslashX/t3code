@@ -36,7 +36,6 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
-import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import {
   Select,
@@ -55,7 +54,7 @@ import {
   DialogPopup,
   DialogTitle,
 } from "../components/ui/dialog";
-import { T3Wordmark } from "../components/sidebar/SidebarChrome";
+import { T3Wordmark } from "../components/T3Wordmark";
 import {
   SettingsPageContainer,
   SettingsRow,
@@ -592,7 +591,7 @@ function Overview({
           icon={Database}
         />
       </div>
-      <Card render={<section />}>
+      <section className="relative flex flex-col rounded-2xl border bg-card text-card-foreground shadow-xs/5">
         <div className="flex items-center justify-between border-b px-5 py-4">
           <div>
             <h3 className="font-medium">Recent workspaces</h3>
@@ -619,7 +618,7 @@ function Overview({
             <div className="p-10 text-center text-sm text-muted-foreground">No workspaces yet.</div>
           ) : null}
         </div>
-      </Card>
+      </section>
     </div>
   );
 }
@@ -634,13 +633,13 @@ function Metric({
   readonly icon: typeof Boxes;
 }) {
   return (
-    <Card className="p-5">
+    <div className="relative flex flex-col rounded-2xl border bg-card p-5 text-card-foreground shadow-xs/5">
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>{label}</span>
         <Icon className="size-4" />
       </div>
       <div className="mt-3 text-3xl font-semibold tracking-[-0.035em]">{value}</div>
-    </Card>
+    </div>
   );
 }
 
