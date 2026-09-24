@@ -6,7 +6,8 @@
 **/.turbo
 **/.vite
 **/coverage
-apps/desktop
+apps/desktop/*
+!apps/desktop/package.json
 apps/mobile
 apps/marketing
 apps/control-plane
