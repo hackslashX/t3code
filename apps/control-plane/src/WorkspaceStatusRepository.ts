@@ -96,7 +96,7 @@ export const make = Effect.gen(function* () {
             ) VALUES (
               ${input.workspaceId}, ${condition.type}, ${condition.status},
               ${condition.reason}, ${condition.message}, ${condition.observedGeneration},
-              ${condition.lastTransitionAt}
+              ${condition.lastTransitionAt.getTime()}
             )
             ON CONFLICT (workspace_id, type) DO UPDATE SET
               status = excluded.status,

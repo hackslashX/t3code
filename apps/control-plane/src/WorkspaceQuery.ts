@@ -74,8 +74,8 @@ interface WorkspaceRow {
   readonly environment_id: string | null;
   readonly failure_reason: string | null;
   readonly failure_message: string | null;
-  readonly created_at: Date;
-  readonly updated_at: Date;
+  readonly created_at: number;
+  readonly updated_at: number;
 }
 
 const mapRow = (row: WorkspaceRow): WorkspaceSummary => ({
@@ -111,8 +111,8 @@ const mapRow = (row: WorkspaceRow): WorkspaceSummary => ({
   ...(row.environment_id === null ? {} : { environmentId: row.environment_id }),
   ...(row.failure_reason === null ? {} : { failureReason: row.failure_reason }),
   ...(row.failure_message === null ? {} : { failureMessage: row.failure_message }),
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
+  createdAt: new Date(row.created_at),
+  updatedAt: new Date(row.updated_at),
 });
 
 export class WorkspaceQuery extends Context.Service<

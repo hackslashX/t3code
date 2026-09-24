@@ -43,7 +43,7 @@ export const make = Effect.gen(function* () {
       const token = NodeCrypto.randomBytes(32).toString("base64url");
       const tokenHash = hashToken(token);
       const ttlSeconds = input?.ttlSeconds ?? 28_800;
-      const rows = yield* sql<{ readonly expires_at: Date }>`
+      const rows = yield* sql<{ readonly expires_at: number }>`
         INSERT INTO web_sessions (id_hash, principal_id, oidc_session_id, expires_at)
         VALUES (
           ${tokenHash}, ${principalId}, ${input?.oidcSessionId ?? null},
@@ -53,7 +53,7 @@ export const make = Effect.gen(function* () {
       `.pipe(Effect.mapError(persistenceError));
       const expiresAt = rows[0]?.expires_at;
       if (expiresAt === undefined) return yield* persistenceError("session insert returned no row");
-      return { token, expiresAt };
+      return { token, expiresAt: new Date(expiresAt) };
     },
   );
 
@@ -62,7 +62,7 @@ export const make = Effect.gen(function* () {
       if (token.length === 0) return yield* new BrowserSessionError({ reason: "invalid_session" });
       const rows = yield* sql<{
         readonly principal_id: PrincipalId;
-        readonly expires_at: Date;
+        readonly expires_at: number;
       }>`
         UPDATE web_sessions AS sessions
         SET last_seen_at = now()
@@ -76,7 +76,7 @@ export const make = Effect.gen(function* () {
       `.pipe(Effect.mapError(persistenceError));
       const row = rows[0];
       if (row === undefined) return yield* new BrowserSessionError({ reason: "invalid_session" });
-      return { principalId: row.principal_id, expiresAt: row.expires_at };
+      return { principalId: row.principal_id, expiresAt: new Date(row.expires_at) };
     },
   );
 

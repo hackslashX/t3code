@@ -85,7 +85,7 @@ export const make = Effect.gen(function* () {
             AND lower(email) = ${email}
             AND accepted_at IS NULL AND revoked_at IS NULL
         `;
-          const rows = yield* sql<{ readonly expires_at: Date }>`
+          const rows = yield* sql<{ readonly expires_at: number }>`
           INSERT INTO organization_invitations (
             id, organization_id, email, role, token_hash,
             invited_by_principal_id, expires_at
@@ -111,7 +111,7 @@ export const make = Effect.gen(function* () {
             ${sql.json({ email, role: input.role, expiresInSeconds })}
           )
         `;
-          return { token, expiresAt };
+          return { token, expiresAt: new Date(expiresAt) };
         }),
       )
       .pipe(Effect.mapError(persistenceError));
