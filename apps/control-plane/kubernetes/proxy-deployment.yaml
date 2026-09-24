@@ -143,6 +143,10 @@ spec:
               app.kubernetes.io/name: t3-hosted-control-plane
               app.kubernetes.io/component: control-plane
       ports:
+        # The proxy connects through the control-plane Service on port 80. Keep
+        # the target container port too for CNIs that apply policy after DNAT.
+        - port: 80
+          protocol: TCP
         - port: 3000
           protocol: TCP
     - to:
