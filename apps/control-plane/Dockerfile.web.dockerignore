@@ -8,7 +8,8 @@ node_modules
 **/dist
 **/build
 **/coverage
-apps/desktop
+apps/desktop/*
+!apps/desktop/package.json
 apps/marketing
 apps/mobile
 infra
