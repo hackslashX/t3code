@@ -5,6 +5,7 @@ import {
   type WorkspaceStorageSummary,
 } from "@t3tools/hosted-contracts";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -111,8 +112,8 @@ const mapRow = (row: WorkspaceRow): WorkspaceSummary => ({
   ...(row.environment_id === null ? {} : { environmentId: row.environment_id }),
   ...(row.failure_reason === null ? {} : { failureReason: row.failure_reason }),
   ...(row.failure_message === null ? {} : { failureMessage: row.failure_message }),
-  createdAt: new Date(row.created_at),
-  updatedAt: new Date(row.updated_at),
+  createdAt: DateTime.toDate(DateTime.makeUnsafe(row.created_at)),
+  updatedAt: DateTime.toDate(DateTime.makeUnsafe(row.updated_at)),
 });
 
 export class WorkspaceQuery extends Context.Service<

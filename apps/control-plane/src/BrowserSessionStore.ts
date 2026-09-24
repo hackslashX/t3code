@@ -2,6 +2,7 @@ import * as PgClient from "@effect/sql-pg/PgClient";
 import { type PrincipalId } from "@t3tools/hosted-contracts";
 import * as NodeCrypto from "node:crypto";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -53,7 +54,7 @@ export const make = Effect.gen(function* () {
       `.pipe(Effect.mapError(persistenceError));
       const expiresAt = rows[0]?.expires_at;
       if (expiresAt === undefined) return yield* persistenceError("session insert returned no row");
-      return { token, expiresAt: new Date(expiresAt) };
+      return { token, expiresAt: DateTime.toDate(DateTime.makeUnsafe(expiresAt)) };
     },
   );
 
@@ -76,7 +77,10 @@ export const make = Effect.gen(function* () {
       `.pipe(Effect.mapError(persistenceError));
       const row = rows[0];
       if (row === undefined) return yield* new BrowserSessionError({ reason: "invalid_session" });
-      return { principalId: row.principal_id, expiresAt: new Date(row.expires_at) };
+      return {
+        principalId: row.principal_id,
+        expiresAt: DateTime.toDate(DateTime.makeUnsafe(row.expires_at)),
+      };
     },
   );
 

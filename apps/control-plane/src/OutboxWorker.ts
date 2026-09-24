@@ -13,9 +13,10 @@ const drain = Effect.fn("OutboxWorker.drain")(function* (workerId: string) {
 
 export const runOutboxWorker = Effect.fn("OutboxWorker.run")(function* (workerId: string) {
   const sql = yield* PgClient.PgClient;
+  const notifications = yield* sql.listen("t3_control_plane_outbox");
   const wakeups = Stream.concat(
     Stream.succeed("startup"),
-    sql.listen("t3_control_plane_outbox"),
+    Stream.fromQueue(notifications).pipe(Stream.map(() => "notification")),
   ).pipe(Stream.merge(Stream.tick("5 seconds").pipe(Stream.map(() => "retry"))));
   return yield* wakeups.pipe(
     Stream.runForEach(() => drain(workerId)),
