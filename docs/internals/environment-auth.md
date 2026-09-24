@@ -1,62 +1,82 @@
-# Environment Authentication Profile
+# Environment authentication
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+The environment issues its own sessions and enforces their capabilities. Cloud
+identity and relay credentials belong to a separate trust boundary, described in
+[T3 Connect](./t3-connect.md). A relay token is never an environment login.
 
-The environment server and the relay use separate credentials, issuers, and trust
-boundaries. They intentionally use a similar OAuth-shaped model so that permission
-checks and token exchange behavior can be audited against established concepts.
+## Authority survives transport changes
 
-## Authorization Model
+Pairing delegates a set of scopes. Exchanging a bootstrap credential can narrow
+that grant but cannot widen it. Ordinary pairing does not grant access-management
+or relay-management authority. Creating another pairing link requires both
+`access:write` and every scope being delegated. The
+[auth handlers](../../apps/server/src/auth/http.ts) enforce this at issuance;
+client labels and device metadata have no authorization role.
 
-Environment authorization is capability-based. A session carries zero or more
-OAuth-style scope strings:
+The access read model contains pairing metadata, never recoverable pairing
+secrets. Only the creation response returns the raw credential. Otherwise read
+access to the connections list would become a way to acquire another client's
+authority.
 
-| Scope                   | Permission                                                               |
-| ----------------------- | ------------------------------------------------------------------------ |
-| `orchestration:read`    | Read snapshots, status, events, configuration, and filesystem/VCS state. |
-| `orchestration:operate` | Dispatch user operations and mutate environment-side workspace state.    |
-| `terminal:operate`      | Create, attach, input, resize, clear, restart, and terminate terminals.  |
-| `review:write`          | Read review diff previews used to compose review feedback.               |
-| `access:read`           | Inspect pairing links and client sessions.                               |
-| `access:write`          | Create or revoke pairing links and client sessions.                      |
-| `relay:read`            | Inspect managed relay connectivity.                                      |
-| `relay:write`           | Link, configure, or unlink managed relay connectivity.                   |
+Browser cookies, bearer tokens, and DPoP tokens adapt the same scoped session
+model. DPoP binds a token to a client's proof key; an invalid proof must fail
+rather than fall back to bearer authentication. The OAuth token-exchange
+vocabulary gives these grants a familiar meaning, but the environment does not
+implement a general-purpose OAuth authorization server.
 
-Ordinary pairing links grant the four client-operation scopes and read access to
-managed relay connectivity:
-`orchestration:read orchestration:operate terminal:operate review:write relay:read`.
-The desktop bootstrap credential and command-line administrative bootstrap
-credentials additionally grant `access:read access:write relay:write`.
+Bearer and DPoP clients obtain short-lived WebSocket tickets through authenticated
+HTTP so long-lived tokens stay out of socket URLs. Browser sessions can
+authenticate the upgrade with their cookie. A successful handshake grants no
+extra authority: [every RPC declares a required
+scope](../../apps/server/src/auth/RpcAuthorization.ts).
 
-## Authentication Flows
+Desktop restarts forget the previous local bearer token, so its reusable
+bootstrap grant replaces earlier sessions for the same subject and method.
+Revocation and insertion share a [database
+transaction](../../apps/server/src/persistence/AuthSessions.ts); a failed
+replacement must leave the old credential usable. Pairing and browser sessions
+do not follow this replacement rule.
 
-### Browser Session
+### Reusable dev credential
 
-`POST /api/auth/browser-session` consumes a one-time bootstrap credential and creates a
-browser session cookie. The cookie is an HTTP transport adapter for the same
-scoped session model; the response never exposes the session secret to browser
-JavaScript.
+Web development environments can accept one `T3CODE_DEV_AUTH_TOKEN` across
+worktrees and ports on one hostname. The token and startup URLs that contain it
+grant administrative access. Desktop and non-development servers ignore it. See
+the [development runbook](../operations/development.md#reusable-dev-credential)
+for setup.
 
-### Bearer Access Token
+Each environment hashes the value and seeds its own database record at startup.
+Environments do not share SQLite data, signing keys, environment IDs, session
+records, pairing grants, or revocation state. Local revocation persists after
+restart and does not affect another worktree. Removing or rotating the value
+and restarting invalidates the old credential and its WebSocket tickets.
 
-Non-browser clients use `POST /oauth/token` with an
-`application/x-www-form-urlencoded` body:
+Normal credentials keep precedence. A rejected normal credential never falls
+back to the reusable credential. OAuth exchanges create ordinary local bearer
+or DPoP children with normal expiry and revocation. The reusable cookie expires
+after 30 days.
 
-```text
-grant_type=urn:ietf:params:oauth:grant-type:token-exchange
-subject_token=<bootstrap credential>
-subject_token_type=urn:t3:params:oauth:token-type:environment-bootstrap
-requested_token_type=urn:ietf:params:oauth:token-type:access_token
-scope=orchestration:read orchestration:operate terminal:operate review:write relay:read
-```
+## The environment is the filesystem boundary
 
-Clients may additionally submit `client_label`, `client_device_type`, and
-`client_os` extension parameters so the authorized-clients UI can identify the
-device that established the session. These are presentation hints only; the
-environment derives transport metadata such as IP address and user agent from
-the request and does not use these fields for authorization.
+Projects are organizational boundaries, not filesystem sandboxes.
+`orchestration:read` permits reading files the server account can read, including
+absolute paths outside a project. This lets clients display artifacts that an
+agent writes in a temporary directory. Relative paths and writes still follow
+the [workspace path rules](../../apps/server/src/workspace/WorkspaceFileSystem.ts).
 
-The response has the token-exchange shape:
+Signed asset URLs are bearer credentials. A URL for media on the host grants
+access to one canonical file and its device/inode identity, not its containing directory.
+[Asset access](../../apps/server/src/assets/AssetAccess.ts) rechecks the opened
+file's identity when serving it, so atomic replacement requires a new URL while
+editing the same file in place does not. An HTML file authorized this way cannot
+load sibling assets; directory-scoped workspace previews are a separate grant.
+Clients should share the authored file reference so they do not disclose the
+temporary URL's credential.
+
+Host videos can change in place. Their [HTTP
+responses](../../apps/server/src/http.ts) omit cache validators because file
+metadata cannot prove byte-for-byte identity for `If-Range`. Adding weak
+validators would turn native-player seeks into full downloads.
 
 ```json
 {
