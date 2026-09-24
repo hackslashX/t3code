@@ -45,6 +45,7 @@ export const layer = Layer.unwrap(
     const url = yield* readDatabaseUrl(path);
     return PgClient.layer({
       url,
+      ssl: { rejectUnauthorized: false },
       applicationName: "t3-hosted-control-plane",
       maxConnections: 10,
       minConnections: 1,
