@@ -108,6 +108,7 @@ class WorkspaceStatusWatchError extends Schema.TaggedError<WorkspaceStatusWatchE
 
 const runStatusProjection = Effect.gen(function* () {
   const context = yield* Effect.context<WorkspaceStatusRepository.WorkspaceStatusRepository>();
+  const runFork = Effect.runForkWith(context);
   const runPromise = Effect.runPromiseWith(context);
   const namespace = (yield* WorkspaceProjection.WorkspaceProjectionConfig).namespace;
   const kubeConfig = yield* KubernetesConfig.KubernetesConfig;
@@ -118,6 +119,14 @@ const runStatusProjection = Effect.gen(function* () {
       kubeConfig,
       signal: controller.signal,
       project: (resource) => runPromise(projectWorkspaceStatus(resource).pipe(Effect.asVoid)),
+      onError: (cause, retryAttempt) => {
+        runFork(
+          Effect.logError("workspace status projection failed; retrying", {
+            retryAttempt,
+            cause,
+          }),
+        );
+      },
     }).then(
       () => resume(Effect.void),
       (cause) => resume(Effect.fail(new WorkspaceStatusWatchError({ cause }))),

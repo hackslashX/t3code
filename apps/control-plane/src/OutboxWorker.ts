@@ -1,5 +1,6 @@
 import * as PgClient from "@effect/sql-pg/PgClient";
 import * as Effect from "effect/Effect";
+import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
 
 import { dispatchNextOutboxEvent } from "./OutboxDispatcher.ts";
@@ -16,5 +17,9 @@ export const runOutboxWorker = Effect.fn("OutboxWorker.run")(function* (workerId
     Stream.succeed("startup"),
     sql.listen("t3_control_plane_outbox"),
   ).pipe(Stream.merge(Stream.tick("5 seconds").pipe(Stream.map(() => "retry"))));
-  return yield* wakeups.pipe(Stream.runForEach(() => drain(workerId)));
+  return yield* wakeups.pipe(
+    Stream.runForEach(() => drain(workerId)),
+    Effect.tapError((error) => Effect.logError("Outbox worker failed; retrying", { error })),
+    Effect.retry(Schedule.spaced("1 second")),
+  );
 });
