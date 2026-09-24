@@ -1,0 +1,24 @@
+FROM node:24.13.1-bookworm-slim AS build
+
+ARG PNPM_VERSION=11.10.0
+# Vite+ initializes its HTTPS client during production builds.
+# hadolint ignore=DL3008
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+WORKDIR /repo
+ENV VITE_T3_HOSTED_DASHBOARD=true
+COPY . .
+RUN pnpm --config.allow-unused-patches=true --ignore-scripts \
+  --filter @t3tools/web... install --frozen-lockfile \
+  && pnpm --filter @t3tools/web build
+
+FROM node:24.13.1-bookworm-slim AS runtime
+ENV NODE_ENV=production PORT=8080
+WORKDIR /app
+COPY --from=build --chown=node:node /repo/apps/web/dist/ /app/web/
+COPY --chown=node:node apps/control-plane/web-server.mjs /app/web-server.mjs
+USER 1000:1000
+EXPOSE 8080
+ENTRYPOINT ["node", "/app/web-server.mjs"]

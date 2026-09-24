@@ -1,0 +1,13 @@
+.git
+.t3
+.repos
+**/node_modules
+**/dist
+**/.turbo
+**/.vite
+**/coverage
+apps/desktop
+apps/mobile
+apps/marketing
+apps/control-plane
+spikes

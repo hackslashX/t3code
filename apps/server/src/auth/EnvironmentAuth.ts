@@ -33,6 +33,7 @@ import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as ServerConfig from "../config.ts";
 import * as EnvironmentAuthPolicy from "./EnvironmentAuthPolicy.ts";
+import * as HostedWorkspaceAuthConfig from "./HostedWorkspaceAuthConfig.ts";
 import * as PairingGrantStore from "./PairingGrantStore.ts";
 import * as ServerSecretStore from "./ServerSecretStore.ts";
 import * as SessionStore from "./SessionStore.ts";
@@ -469,6 +470,7 @@ export class EnvironmentAuth extends Context.Service<
       readonly subject?: string;
       readonly scopes?: ReadonlyArray<AuthEnvironmentScope>;
       readonly label?: string;
+      readonly client?: AuthClientMetadata;
     }) => Effect.Effect<IssuedBearerSession, ServerAuthInternalError>;
     readonly listSessions: () => Effect.Effect<
       ReadonlyArray<AuthClientSession>,
@@ -604,9 +606,16 @@ export const make = Effect.gen(function* () {
   const sessions = yield* SessionStore.SessionStore;
   const secretStore = yield* ServerSecretStore.ServerSecretStore;
   const crypto = yield* Crypto.Crypto;
-  const descriptor = yield* policy.getDescriptor();
+  const baseDescriptor = yield* policy.getDescriptor();
   const config = yield* ServerConfig.ServerConfig;
   const devAuth = resolveReusableDevAuth(config);
+  const hostedWorkspaceAuth = yield* HostedWorkspaceAuthConfig.HostedWorkspaceAuthConfig;
+  const descriptor: ServerAuthDescriptor = hostedWorkspaceAuth.enabled
+    ? {
+        ...baseDescriptor,
+        bootstrapMethods: [...baseDescriptor.bootstrapMethods, "hosted-workspace-assertion"],
+      }
+    : baseDescriptor;
 
   const authenticateToken = (
     token: string,
@@ -935,7 +944,7 @@ export const make = Effect.gen(function* () {
         subject: input?.subject ?? DEFAULT_SESSION_SUBJECT,
         method: "bearer-access-token",
         scopes: input?.scopes ?? AuthAdministrativeScopes,
-        client: {
+        client: input?.client ?? {
           ...(input?.label ? { label: input.label } : {}),
           deviceType: "bot",
         },
