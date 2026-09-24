@@ -52,10 +52,10 @@ export class HostedWorkspaceAssertionIssuer extends Context.Service<
 >()("@t3tools/control-plane/HostedWorkspaceAssertionIssuer") {}
 
 const issuerConfig = Config.all({
-  issuer: Config.string("T3CODE_HOSTED_ASSERTION_ISSUER"),
-  keyId: Config.string("T3CODE_HOSTED_ASSERTION_KEY_ID"),
-  privateKeyFile: Config.string("T3CODE_HOSTED_ASSERTION_PRIVATE_KEY_FILE"),
-  lifetimeSeconds: Config.int("T3CODE_HOSTED_ASSERTION_LIFETIME_SECONDS").pipe(
+  issuer: Config.String("T3CODE_HOSTED_ASSERTION_ISSUER"),
+  keyId: Config.String("T3CODE_HOSTED_ASSERTION_KEY_ID"),
+  privateKeyFile: Config.String("T3CODE_HOSTED_ASSERTION_PRIVATE_KEY_FILE"),
+  lifetimeSeconds: Config.Int("T3CODE_HOSTED_ASSERTION_LIFETIME_SECONDS").pipe(
     Config.withDefault(60),
   ),
 });

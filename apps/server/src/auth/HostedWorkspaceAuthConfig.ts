@@ -38,10 +38,10 @@ export const HostedWorkspaceAuthConfig = Context.Reference<HostedWorkspaceAuthCo
 );
 
 const envConfig = Config.all({
-  issuer: Config.string("T3CODE_HOSTED_WORKSPACE_ISSUER").pipe(Config.option),
-  workspaceId: Config.string("T3CODE_HOSTED_WORKSPACE_ID").pipe(Config.option),
-  publicKeysDir: Config.string("T3CODE_HOSTED_WORKSPACE_PUBLIC_KEYS_DIR").pipe(Config.option),
-  sessionLifetimeSeconds: Config.int("T3CODE_HOSTED_WORKSPACE_SESSION_LIFETIME_SECONDS").pipe(
+  issuer: Config.String("T3CODE_HOSTED_WORKSPACE_ISSUER").pipe(Config.option),
+  workspaceId: Config.String("T3CODE_HOSTED_WORKSPACE_ID").pipe(Config.option),
+  publicKeysDir: Config.String("T3CODE_HOSTED_WORKSPACE_PUBLIC_KEYS_DIR").pipe(Config.option),
+  sessionLifetimeSeconds: Config.Int("T3CODE_HOSTED_WORKSPACE_SESSION_LIFETIME_SECONDS").pipe(
     Config.withDefault(300),
   ),
 });

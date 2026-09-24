@@ -37,8 +37,8 @@ import { runWorkspaceStatusWatch } from "./WorkspaceStatusWatch.ts";
 import * as WorkspaceVolumeRepository from "./WorkspaceVolumeRepository.ts";
 
 const serverConfig = Config.all({
-  host: Config.string("T3CODE_CONTROL_PLANE_HOST").pipe(Config.withDefault("0.0.0.0")),
-  port: Config.number("T3CODE_CONTROL_PLANE_PORT").pipe(Config.withDefault(3000)),
+  host: Config.String("T3CODE_CONTROL_PLANE_HOST").pipe(Config.withDefault("0.0.0.0")),
+  port: Config.Number("T3CODE_CONTROL_PLANE_PORT").pipe(Config.withDefault(3000)),
 });
 
 const PlatformLayer = NodeServices.layer;

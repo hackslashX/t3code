@@ -21,7 +21,7 @@ export class ControlPlaneMigrationError extends Schema.TaggedError<ControlPlaneM
 ) {}
 
 const defaultMigrationsDirectory = new URL("../migrations", import.meta.url).pathname;
-const migrationsDirectory = Config.string("T3CODE_CONTROL_PLANE_MIGRATIONS_DIR").pipe(
+const migrationsDirectory = Config.String("T3CODE_CONTROL_PLANE_MIGRATIONS_DIR").pipe(
   Config.withDefault(defaultMigrationsDirectory),
 );
 

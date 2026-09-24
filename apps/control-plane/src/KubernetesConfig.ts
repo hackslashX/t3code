@@ -18,7 +18,7 @@ export class KubernetesConfig extends Context.Service<KubernetesConfig, KubeConf
   "@t3tools/control-plane/KubernetesConfig",
 ) {}
 
-const kubeconfigFile = Config.string("T3CODE_KUBERNETES_KUBECONFIG_FILE").pipe(Config.option);
+const kubeconfigFile = Config.String("T3CODE_KUBERNETES_KUBECONFIG_FILE").pipe(Config.option);
 
 export const make = Effect.gen(function* () {
   const file = yield* kubeconfigFile;

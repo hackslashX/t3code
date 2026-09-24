@@ -100,9 +100,9 @@ export class WorkspaceTokenExchange extends Context.Service<
 >()("@t3tools/control-plane/WorkspaceProxySession/WorkspaceTokenExchange") {}
 
 const sessionConfig = Config.all({
-  keyFile: Config.string("T3CODE_WORKSPACE_PROXY_SESSION_KEY_FILE"),
-  hostSuffix: Config.string("T3CODE_WORKSPACE_PROXY_HOST_SUFFIX"),
-  cookieDomain: Config.string("T3CODE_WORKSPACE_PROXY_COOKIE_DOMAIN"),
+  keyFile: Config.String("T3CODE_WORKSPACE_PROXY_SESSION_KEY_FILE"),
+  hostSuffix: Config.String("T3CODE_WORKSPACE_PROXY_HOST_SUFFIX"),
+  cookieDomain: Config.String("T3CODE_WORKSPACE_PROXY_COOKIE_DOMAIN"),
 });
 
 export const sessionLayer = Layer.effect(

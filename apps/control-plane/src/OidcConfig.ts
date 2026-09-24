@@ -28,11 +28,11 @@ export class OidcConfig extends Context.Service<OidcConfig, OidcConfigValue>()(
 ) {}
 
 const environment = Config.all({
-  issuer: Config.string("T3CODE_CONTROL_PLANE_OIDC_ISSUER"),
-  clientId: Config.string("T3CODE_CONTROL_PLANE_OIDC_CLIENT_ID"),
-  clientSecretFile: Config.string("T3CODE_CONTROL_PLANE_OIDC_CLIENT_SECRET_FILE"),
-  publicBaseUrl: Config.string("T3CODE_CONTROL_PLANE_PUBLIC_BASE_URL"),
-  transactionKeyFile: Config.string("T3CODE_CONTROL_PLANE_OIDC_TRANSACTION_KEY_FILE"),
+  issuer: Config.String("T3CODE_CONTROL_PLANE_OIDC_ISSUER"),
+  clientId: Config.String("T3CODE_CONTROL_PLANE_OIDC_CLIENT_ID"),
+  clientSecretFile: Config.String("T3CODE_CONTROL_PLANE_OIDC_CLIENT_SECRET_FILE"),
+  publicBaseUrl: Config.String("T3CODE_CONTROL_PLANE_PUBLIC_BASE_URL"),
+  transactionKeyFile: Config.String("T3CODE_CONTROL_PLANE_OIDC_TRANSACTION_KEY_FILE"),
 });
 
 const readSecret = Effect.fn("OidcConfig.readSecret")(function* (path: string) {

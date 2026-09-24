@@ -15,7 +15,7 @@ export class ControlPlaneDatabaseConfigError extends Schema.TaggedError<ControlP
   },
 ) {}
 
-const databaseUrlFile = Config.string("T3CODE_CONTROL_PLANE_DATABASE_URL_FILE");
+const databaseUrlFile = Config.String("T3CODE_CONTROL_PLANE_DATABASE_URL_FILE");
 
 export const readDatabaseUrl = Effect.fn("ControlPlaneDatabase.readUrl")(function* (path: string) {
   const fileSystem = yield* FileSystem.FileSystem;

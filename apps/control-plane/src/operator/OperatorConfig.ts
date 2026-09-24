@@ -12,8 +12,8 @@ export class OperatorConfigError extends Schema.TaggedError<OperatorConfigError>
 ) {}
 
 const environment = Config.all({
-  namespace: Config.string("T3CODE_WORKSPACE_OPERATOR_NAMESPACE"),
-  egressCidrsFile: Config.string("T3CODE_WORKSPACE_OPERATOR_EGRESS_CIDRS_FILE"),
+  namespace: Config.String("T3CODE_WORKSPACE_OPERATOR_NAMESPACE"),
+  egressCidrsFile: Config.String("T3CODE_WORKSPACE_OPERATOR_EGRESS_CIDRS_FILE"),
 });
 const EgressCidrs = Schema.Record(Schema.String, Schema.Array(Schema.String));
 

@@ -49,7 +49,7 @@ export class WorkspaceCatalog extends Context.Service<WorkspaceCatalog, Workspac
   "@t3tools/control-plane/WorkspaceCatalog",
 ) {}
 
-const catalogFile = Config.string("T3CODE_CONTROL_PLANE_WORKSPACE_CATALOG_FILE");
+const catalogFile = Config.String("T3CODE_CONTROL_PLANE_WORKSPACE_CATALOG_FILE");
 
 export const decodeWorkspaceCatalog = Effect.fn("WorkspaceCatalog.decode")(function* (
   contents: string,

@@ -30,9 +30,9 @@ export class WorkspaceProjectionConfig extends Context.Service<
 >()("@t3tools/control-plane/WorkspaceProjection/WorkspaceProjectionConfig") {}
 
 const config = Config.all({
-  namespace: Config.string("T3CODE_WORKSPACE_NAMESPACE"),
-  hostedAuthIssuer: Config.string("T3CODE_HOSTED_WORKSPACE_ISSUER"),
-  hostedAuthPublicKeysConfigMap: Config.string("T3CODE_HOSTED_WORKSPACE_PUBLIC_KEYS_CONFIG_MAP"),
+  namespace: Config.String("T3CODE_WORKSPACE_NAMESPACE"),
+  hostedAuthIssuer: Config.String("T3CODE_HOSTED_WORKSPACE_ISSUER"),
+  hostedAuthPublicKeysConfigMap: Config.String("T3CODE_HOSTED_WORKSPACE_PUBLIC_KEYS_CONFIG_MAP"),
 });
 
 export const configLayer = Layer.effect(
