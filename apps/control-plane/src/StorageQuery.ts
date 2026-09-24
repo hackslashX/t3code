@@ -12,7 +12,7 @@ import * as Schema from "effect/Schema";
 
 import * as WorkspaceCatalog from "./WorkspaceCatalog.ts";
 
-export class StorageQueryError extends Schema.TaggedErrorClass<StorageQueryError>()(
+export class StorageQueryError extends Schema.TaggedError<StorageQueryError>()(
   "StorageQueryError",
   {
     reason: Schema.Literal("persistence_failed"),

@@ -13,7 +13,7 @@ const VERSION = "v1alpha1";
 const PLURAL = "t3workspaces";
 const FIELD_MANAGER = "t3-hosted-control-plane";
 
-export class WorkspaceResourcePublisherError extends Schema.TaggedErrorClass<WorkspaceResourcePublisherError>()(
+export class WorkspaceResourcePublisherError extends Schema.TaggedError<WorkspaceResourcePublisherError>()(
   "WorkspaceResourcePublisherError",
   {
     reason: Schema.Literals(["kubernetes_request_failed", "pvc_conflict"]),

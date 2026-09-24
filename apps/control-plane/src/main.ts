@@ -101,7 +101,7 @@ const ApplicationLayer = HttpRouter.serve(Routes.layer, {
   disableLogger: false,
 }).pipe(Layer.provideMerge(HttpServerLayer), Layer.provideMerge(PlatformLayer));
 
-class WorkspaceStatusWatchError extends Schema.TaggedErrorClass<WorkspaceStatusWatchError>()(
+class WorkspaceStatusWatchError extends Schema.TaggedError<WorkspaceStatusWatchError>()(
   "WorkspaceStatusWatchError",
   { cause: Schema.Defect() },
 ) {}

@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export class WorkspaceVolumeRepositoryError extends Schema.TaggedErrorClass<WorkspaceVolumeRepositoryError>()(
+export class WorkspaceVolumeRepositoryError extends Schema.TaggedError<WorkspaceVolumeRepositoryError>()(
   "WorkspaceVolumeRepositoryError",
   {
     reason: Schema.Literals(["volume_not_found", "pvc_uid_conflict", "persistence_failed"]),

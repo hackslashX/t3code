@@ -9,7 +9,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export class WorkspaceQueryError extends Schema.TaggedErrorClass<WorkspaceQueryError>()(
+export class WorkspaceQueryError extends Schema.TaggedError<WorkspaceQueryError>()(
   "WorkspaceQueryError",
   {
     reason: Schema.Literals(["workspace_not_found", "persistence_failed"]),

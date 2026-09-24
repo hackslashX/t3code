@@ -6,7 +6,7 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-export class ControlPlaneDatabaseConfigError extends Schema.TaggedErrorClass<ControlPlaneDatabaseConfigError>()(
+export class ControlPlaneDatabaseConfigError extends Schema.TaggedError<ControlPlaneDatabaseConfigError>()(
   "ControlPlaneDatabaseConfigError",
   {
     reason: Schema.Literals(["database_url_read_failed", "database_url_empty"]),

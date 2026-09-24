@@ -18,7 +18,7 @@ export type HostedWorkspaceAuthConfigValue =
       readonly sessionLifetimeSeconds: number;
     };
 
-export class HostedWorkspaceAuthConfigError extends Schema.TaggedErrorClass<HostedWorkspaceAuthConfigError>()(
+export class HostedWorkspaceAuthConfigError extends Schema.TaggedError<HostedWorkspaceAuthConfigError>()(
   "HostedWorkspaceAuthConfigError",
   {
     reason: Schema.Literals([

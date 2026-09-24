@@ -30,7 +30,7 @@ export const WorkspacePolicyRejectionReason = Schema.Literals([
 ]);
 export type WorkspacePolicyRejectionReason = typeof WorkspacePolicyRejectionReason.Type;
 
-export class WorkspacePolicyRejectedError extends Schema.TaggedErrorClass<WorkspacePolicyRejectedError>()(
+export class WorkspacePolicyRejectedError extends Schema.TaggedError<WorkspacePolicyRejectedError>()(
   "WorkspacePolicyRejectedError",
   { reason: WorkspacePolicyRejectionReason },
 ) {}

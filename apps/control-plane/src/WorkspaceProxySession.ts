@@ -25,7 +25,7 @@ const ExchangeResponse = Schema.Struct({
   expires_in: Schema.Number,
 });
 
-export class WorkspaceProxySessionError extends Schema.TaggedErrorClass<WorkspaceProxySessionError>()(
+export class WorkspaceProxySessionError extends Schema.TaggedError<WorkspaceProxySessionError>()(
   "WorkspaceProxySessionError",
   {
     reason: Schema.Literals([

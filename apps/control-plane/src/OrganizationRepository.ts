@@ -10,7 +10,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export class OrganizationRepositoryError extends Schema.TaggedErrorClass<OrganizationRepositoryError>()(
+export class OrganizationRepositoryError extends Schema.TaggedError<OrganizationRepositoryError>()(
   "OrganizationRepositoryError",
   {
     reason: Schema.Literals(["organization_not_found", "persistence_failed"]),

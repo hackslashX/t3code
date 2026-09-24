@@ -5,7 +5,7 @@ import * as SchemaTransformation from "effect/SchemaTransformation";
 const TrimmedNonEmptyString = Schema.String.pipe(
   Schema.decodeTo(
     Schema.String,
-    SchemaTransformation.transformOrFail({
+    SchemaTransformation.transformEffect({
       decode: (value) => Effect.succeed(value.trim()),
       encode: (value) => Effect.succeed(value.trim()),
     }),

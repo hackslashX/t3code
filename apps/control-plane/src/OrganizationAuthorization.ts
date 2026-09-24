@@ -23,7 +23,7 @@ export const OrganizationAction = Schema.Literals([
 ]);
 export type OrganizationAction = typeof OrganizationAction.Type;
 
-export class OrganizationAuthorizationError extends Schema.TaggedErrorClass<OrganizationAuthorizationError>()(
+export class OrganizationAuthorizationError extends Schema.TaggedError<OrganizationAuthorizationError>()(
   "OrganizationAuthorizationError",
   {
     reason: Schema.Literals(["access_denied", "persistence_failed"]),

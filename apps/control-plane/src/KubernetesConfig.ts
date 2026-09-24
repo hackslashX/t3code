@@ -6,7 +6,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-export class KubernetesConfigError extends Schema.TaggedErrorClass<KubernetesConfigError>()(
+export class KubernetesConfigError extends Schema.TaggedError<KubernetesConfigError>()(
   "KubernetesConfigError",
   {
     reason: Schema.Literals(["kubernetes_config_load_failed"]),

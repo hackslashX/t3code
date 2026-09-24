@@ -7,7 +7,7 @@ import { BROWSER_SESSION_COOKIE } from "./AuthCookies.ts";
 import * as BrowserSessionStore from "./BrowserSessionStore.ts";
 import * as OidcConfig from "./OidcConfig.ts";
 
-export class RequestAuthenticationError extends Schema.TaggedErrorClass<RequestAuthenticationError>()(
+export class RequestAuthenticationError extends Schema.TaggedError<RequestAuthenticationError>()(
   "RequestAuthenticationError",
   {
     reason: Schema.Literals(["authentication_required", "origin_forbidden"]),

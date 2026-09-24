@@ -9,7 +9,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export class IdentityQueryError extends Schema.TaggedErrorClass<IdentityQueryError>()(
+export class IdentityQueryError extends Schema.TaggedError<IdentityQueryError>()(
   "IdentityQueryError",
   {
     reason: Schema.Literals(["principal_not_found", "persistence_failed"]),

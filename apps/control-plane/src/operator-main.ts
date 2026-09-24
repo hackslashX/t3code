@@ -8,7 +8,7 @@ import * as KubernetesConfig from "./KubernetesConfig.ts";
 import { loadOperatorConfig } from "./operator/OperatorConfig.ts";
 import { runWorkspaceOperator } from "./operator/WorkspaceOperatorRuntime.ts";
 
-class WorkspaceOperatorRuntimeError extends Schema.TaggedErrorClass<WorkspaceOperatorRuntimeError>()(
+class WorkspaceOperatorRuntimeError extends Schema.TaggedError<WorkspaceOperatorRuntimeError>()(
   "WorkspaceOperatorRuntimeError",
   { cause: Schema.Defect() },
 ) {}

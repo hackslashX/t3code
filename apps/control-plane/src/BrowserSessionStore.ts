@@ -6,7 +6,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export class BrowserSessionError extends Schema.TaggedErrorClass<BrowserSessionError>()(
+export class BrowserSessionError extends Schema.TaggedError<BrowserSessionError>()(
   "BrowserSessionError",
   {
     reason: Schema.Literals(["invalid_session", "persistence_failed"]),

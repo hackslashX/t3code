@@ -31,7 +31,7 @@ export interface WorkspaceStatusProjection {
   }>;
 }
 
-export class WorkspaceStatusRepositoryError extends Schema.TaggedErrorClass<WorkspaceStatusRepositoryError>()(
+export class WorkspaceStatusRepositoryError extends Schema.TaggedError<WorkspaceStatusRepositoryError>()(
   "WorkspaceStatusRepositoryError",
   {
     reason: Schema.Literals(["workspace_not_found", "invalid_generation", "persistence_failed"]),

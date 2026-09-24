@@ -9,7 +9,7 @@ import * as Schema from "effect/Schema";
 import type { T3WorkspaceResource } from "./operator/WorkspaceRenderer.ts";
 import * as WorkspaceCatalog from "./WorkspaceCatalog.ts";
 
-export class WorkspaceProjectionError extends Schema.TaggedErrorClass<WorkspaceProjectionError>()(
+export class WorkspaceProjectionError extends Schema.TaggedError<WorkspaceProjectionError>()(
   "WorkspaceProjectionError",
   {
     reason: Schema.Literals(["workspace_not_found", "persistence_failed"]),

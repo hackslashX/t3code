@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Schema from "effect/Schema";
 
-export class OperatorConfigError extends Schema.TaggedErrorClass<OperatorConfigError>()(
+export class OperatorConfigError extends Schema.TaggedError<OperatorConfigError>()(
   "OperatorConfigError",
   {
     reason: Schema.Literals(["egress_config_read_failed", "egress_config_invalid"]),

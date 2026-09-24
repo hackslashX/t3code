@@ -8,7 +8,7 @@ import * as Schema from "effect/Schema";
 
 import { decodeOidcTransactionKey } from "./OidcLogin.ts";
 
-export class OidcConfigError extends Schema.TaggedErrorClass<OidcConfigError>()("OidcConfigError", {
+export class OidcConfigError extends Schema.TaggedError<OidcConfigError>()("OidcConfigError", {
   reason: Schema.Literals(["secret_read_failed", "secret_empty", "invalid_url", "invalid_key"]),
   path: Schema.optionalKey(Schema.String),
   cause: Schema.optionalKey(Schema.Defect()),

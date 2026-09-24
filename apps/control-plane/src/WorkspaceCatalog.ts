@@ -29,7 +29,7 @@ const WorkspaceCatalogDocument = Schema.Struct({
   ),
 });
 
-export class WorkspaceCatalogError extends Schema.TaggedErrorClass<WorkspaceCatalogError>()(
+export class WorkspaceCatalogError extends Schema.TaggedError<WorkspaceCatalogError>()(
   "WorkspaceCatalogError",
   {
     reason: Schema.Literals(["catalog_read_failed", "catalog_invalid"]),

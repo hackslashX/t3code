@@ -21,7 +21,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export class HostedWorkspaceAssertionIssuerError extends Schema.TaggedErrorClass<HostedWorkspaceAssertionIssuerError>()(
+export class HostedWorkspaceAssertionIssuerError extends Schema.TaggedError<HostedWorkspaceAssertionIssuerError>()(
   "HostedWorkspaceAssertionIssuerError",
   {
     reason: Schema.Literals(["signing_key_read_failed", "signing_key_invalid", "signing_failed"]),

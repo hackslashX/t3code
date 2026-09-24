@@ -6,7 +6,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-export class WorkspaceProxyGrantError extends Schema.TaggedErrorClass<WorkspaceProxyGrantError>()(
+export class WorkspaceProxyGrantError extends Schema.TaggedError<WorkspaceProxyGrantError>()(
   "WorkspaceProxyGrantError",
   { reason: Schema.Literals(["invalid_grant", "persistence_failed"]), cause: Schema.optionalKey(Schema.Defect()) },
 ) {}

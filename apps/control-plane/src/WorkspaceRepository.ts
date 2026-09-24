@@ -31,7 +31,7 @@ export const WorkspaceRepositoryErrorReason = Schema.Literals([
 ]);
 export type WorkspaceRepositoryErrorReason = typeof WorkspaceRepositoryErrorReason.Type;
 
-export class WorkspaceRepositoryError extends Schema.TaggedErrorClass<WorkspaceRepositoryError>()(
+export class WorkspaceRepositoryError extends Schema.TaggedError<WorkspaceRepositoryError>()(
   "WorkspaceRepositoryError",
   {
     reason: WorkspaceRepositoryErrorReason,

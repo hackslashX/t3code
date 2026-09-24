@@ -14,7 +14,7 @@ export interface ClaimedOutboxEvent {
   readonly attemptCount: number;
 }
 
-export class OutboxRepositoryError extends Schema.TaggedErrorClass<OutboxRepositoryError>()(
+export class OutboxRepositoryError extends Schema.TaggedError<OutboxRepositoryError>()(
   "OutboxRepositoryError",
   {
     reason: Schema.Literals(["claim_lost", "persistence_failed"]),

@@ -12,7 +12,7 @@ import * as Schema from "effect/Schema";
 
 export type InvitationRole = Exclude<OrganizationRole, "owner">;
 
-export class InvitationRepositoryError extends Schema.TaggedErrorClass<InvitationRepositoryError>()(
+export class InvitationRepositoryError extends Schema.TaggedError<InvitationRepositoryError>()(
   "InvitationRepositoryError",
   {
     reason: Schema.Literals([

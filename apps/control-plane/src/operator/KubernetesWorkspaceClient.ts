@@ -8,7 +8,7 @@ import type {
 } from "./WorkspaceReconciler.ts";
 import type { T3WorkspaceResource } from "./WorkspaceRenderer.ts";
 
-export class KubernetesWorkspaceClientError extends Schema.TaggedErrorClass<KubernetesWorkspaceClientError>()(
+export class KubernetesWorkspaceClientError extends Schema.TaggedError<KubernetesWorkspaceClientError>()(
   "KubernetesWorkspaceClientError",
   {
     operation: Schema.String,

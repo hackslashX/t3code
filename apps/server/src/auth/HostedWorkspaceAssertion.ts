@@ -33,12 +33,12 @@ export const HostedWorkspaceAssertionRejectionReason = Schema.Literals([
 export type HostedWorkspaceAssertionRejectionReason =
   typeof HostedWorkspaceAssertionRejectionReason.Type;
 
-export class HostedWorkspaceAssertionRejectedError extends Schema.TaggedErrorClass<HostedWorkspaceAssertionRejectedError>()(
+export class HostedWorkspaceAssertionRejectedError extends Schema.TaggedError<HostedWorkspaceAssertionRejectedError>()(
   "HostedWorkspaceAssertionRejectedError",
   { reason: HostedWorkspaceAssertionRejectionReason },
 ) {}
 
-export class HostedWorkspaceAssertionReplayRecordError extends Schema.TaggedErrorClass<HostedWorkspaceAssertionReplayRecordError>()(
+export class HostedWorkspaceAssertionReplayRecordError extends Schema.TaggedError<HostedWorkspaceAssertionReplayRecordError>()(
   "HostedWorkspaceAssertionReplayRecordError",
   { cause: Schema.Defect() },
 ) {}

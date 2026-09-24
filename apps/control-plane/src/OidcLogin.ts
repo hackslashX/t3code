@@ -12,7 +12,7 @@ const LoginTransaction = Schema.Struct({
 });
 type LoginTransaction = typeof LoginTransaction.Type;
 
-export class OidcLoginTransactionError extends Schema.TaggedErrorClass<OidcLoginTransactionError>()(
+export class OidcLoginTransactionError extends Schema.TaggedError<OidcLoginTransactionError>()(
   "OidcLoginTransactionError",
   {
     reason: Schema.Literals([

@@ -38,7 +38,7 @@ export interface OidcIdentity {
   readonly oidcSessionId?: string;
 }
 
-export class OidcProviderError extends Schema.TaggedErrorClass<OidcProviderError>()(
+export class OidcProviderError extends Schema.TaggedError<OidcProviderError>()(
   "OidcProviderError",
   {
     reason: Schema.Literals([

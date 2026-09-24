@@ -12,7 +12,7 @@ import * as Schema from "effect/Schema";
 import * as WorkspaceCatalog from "./WorkspaceCatalog.ts";
 import type { WorkspaceAdmissionPolicy } from "./workspacePolicy.ts";
 
-export class WorkspaceAdmissionError extends Schema.TaggedErrorClass<WorkspaceAdmissionError>()(
+export class WorkspaceAdmissionError extends Schema.TaggedError<WorkspaceAdmissionError>()(
   "WorkspaceAdmissionError",
   {
     reason: Schema.Literals(["organization_quota_missing", "persistence_failed"]),

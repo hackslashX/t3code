@@ -8,7 +8,7 @@ import * as Schema from "effect/Schema";
 
 import type { OidcIdentity } from "./OidcProvider.ts";
 
-export class IdentityRepositoryError extends Schema.TaggedErrorClass<IdentityRepositoryError>()(
+export class IdentityRepositoryError extends Schema.TaggedError<IdentityRepositoryError>()(
   "IdentityRepositoryError",
   {
     reason: Schema.Literals([
