@@ -109,7 +109,9 @@ export const make = Effect.gen(function* () {
   const discovery = yield* Schema.decodeUnknownEffect(OidcDiscoveryDocument)(discoveryUnknown).pipe(
     Effect.mapError((cause) => new OidcProviderError({ reason: "discovery_failed", cause })),
   );
-  if (discovery.issuer !== config.issuer.toString().replace(/\/$/, "")) {
+  if (
+    discovery.issuer.replace(/\/$/, "") !== config.issuer.toString().replace(/\/$/, "")
+  ) {
     return yield* new OidcProviderError({ reason: "issuer_mismatch" });
   }
   const jwks = createRemoteJWKSet(new URL(discovery.jwks_uri));
