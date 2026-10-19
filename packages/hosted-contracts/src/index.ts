@@ -12,7 +12,7 @@ const TrimmedNonEmptyString = Schema.String.pipe(
   ),
   Schema.check(Schema.isNonEmpty()),
 );
-const makeId = <Brand extends string>(brand: Brand) =>
+const makeId = <Brand extends string>(brand: Parameters<typeof Schema.brand<Brand>>[0]) =>
   TrimmedNonEmptyString.pipe(Schema.brand(brand));
 
 export const PrincipalId = makeId("HostedPrincipalId");

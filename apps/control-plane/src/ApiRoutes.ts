@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import { HttpRouter, HttpServerResponse } from "effect/unstable/http";
+import { HttpRouter, HttpServerResponse } from "effect/http";
 
 import * as IdentityQuery from "./IdentityQuery.ts";
 import { authenticateRequest, RequestAuthenticationError } from "./RequestAuthentication.ts";

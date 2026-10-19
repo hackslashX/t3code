@@ -13,7 +13,7 @@ import {
   HttpServerError,
   HttpServerRequest,
   HttpServerResponse,
-} from "effect/unstable/http";
+} from "effect/http";
 import * as Layer from "effect/Layer";
 
 import { InvitationRepositoryError } from "./InvitationRepository.ts";

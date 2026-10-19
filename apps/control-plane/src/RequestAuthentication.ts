@@ -1,7 +1,7 @@
 import type { PrincipalId } from "@t3tools/hosted-contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { HttpServerRequest } from "effect/unstable/http";
+import { HttpServerRequest } from "effect/http";
 
 import { BROWSER_SESSION_COOKIE } from "./AuthCookies.ts";
 import * as BrowserSessionStore from "./BrowserSessionStore.ts";

@@ -5,7 +5,7 @@ import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { FetchHttpClient, HttpRouter } from "effect/unstable/http";
+import { FetchHttpClient, HttpRouter } from "effect/http";
 
 import * as BrowserSessionStore from "./BrowserSessionStore.ts";
 import * as Database from "./Database.ts";

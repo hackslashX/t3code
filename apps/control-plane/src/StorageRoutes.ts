@@ -1,7 +1,7 @@
 import { OrganizationId } from "@t3tools/hosted-contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { HttpRouter, HttpServerResponse } from "effect/unstable/http";
+import { HttpRouter, HttpServerResponse } from "effect/http";
 
 import { OrganizationAuthorizationError } from "./OrganizationAuthorization.ts";
 import * as OrganizationAuthorization from "./OrganizationAuthorization.ts";

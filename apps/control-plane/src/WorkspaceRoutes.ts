@@ -13,13 +13,13 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import * as Cookies from "effect/unstable/http/Cookies";
+import * as Cookies from "effect/http/Cookies";
 import {
   HttpRouter,
   HttpServerError,
   HttpServerRequest,
   HttpServerResponse,
-} from "effect/unstable/http";
+} from "effect/http";
 
 import { HostedWorkspaceAssertionIssuerError } from "./HostedWorkspaceAssertionIssuer.ts";
 import * as HostedWorkspaceAssertionIssuer from "./HostedWorkspaceAssertionIssuer.ts";

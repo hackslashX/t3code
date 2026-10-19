@@ -1,7 +1,7 @@
 import * as PgClient from "@effect/sql-pg/PgClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { HttpRouter, HttpServerResponse } from "effect/unstable/http";
+import { HttpRouter, HttpServerResponse } from "effect/http";
 
 const liveRoute = HttpRouter.add(
   "GET",

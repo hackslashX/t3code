@@ -4,8 +4,8 @@ import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import * as Cookies from "effect/unstable/http/Cookies";
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+import * as Cookies from "effect/http/Cookies";
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { BROWSER_SESSION_COOKIE, LOGIN_TRANSACTION_COOKIE } from "./AuthCookies.ts";
 import * as BrowserSessionStore from "./BrowserSessionStore.ts";

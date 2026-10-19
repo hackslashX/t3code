@@ -9,7 +9,7 @@ import {
   HttpClientError,
   HttpClientRequest,
   HttpClientResponse,
-} from "effect/unstable/http";
+} from "effect/http";
 
 import * as OidcConfig from "./OidcConfig.ts";
 
