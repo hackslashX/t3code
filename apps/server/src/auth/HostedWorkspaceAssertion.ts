@@ -9,7 +9,7 @@ import * as NodeCrypto from "node:crypto";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as Encoding from "effect/Encoding";
+import * as Base64Url from "effect/encoding/Base64Url";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
@@ -145,7 +145,7 @@ export const consumeHostedWorkspaceAssertionReplay = Effect.fn(
     Effect.flatMap((crypto) =>
       crypto.digest("SHA-256", new TextEncoder().encode(`${claims.iss}:${claims.jti}`)),
     ),
-    Effect.map(Encoding.encodeBase64Url),
+    Effect.map(Base64Url.encode),
     Effect.mapError((cause) => new HostedWorkspaceAssertionReplayRecordError({ cause })),
   );
   const secretStore = yield* ServerSecretStore.ServerSecretStore;
